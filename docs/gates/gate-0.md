@@ -81,7 +81,7 @@ GitHub checks on this pull request: database, web and worker all pass (the first
 1. ~~Supabase project~~ done (eu-west-1 Ireland, still EU).
 2. ~~Run the migrations~~ done through the Supabase connector.
 3. Authentication > URL configuration: add `http://localhost:3000/auth/callback` and your Vercel address plus `/auth/callback`.
-4. Vercel: new project from this repo, root directory `apps/web`, environment variables from `apps/web/.env.example`.
+4. ~~Vercel project~~ done: project `shortlist`, root `apps/web`, Next.js, Node 22. Production variables come from the Supabase integration; the two public values were added for previews too.
 5. Sign in once with your email and tell me it worked, or what you saw.
 6. Merge the pull request to approve.
 
