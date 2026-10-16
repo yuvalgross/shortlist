@@ -8,7 +8,7 @@ Every component arrives as one pull request, a "gate". Nothing moves on until th
 
 | Gate | Component | Status |
 |---|---|---|
-| 0 | Foundation: schema, data isolation, login, repo layout | In review |
+| 0 | Foundation: schema, data isolation, login, repo layout | In review (PR #1) |
 | 1 | Profile from CV: upload, parsing, skills, priorities, suggestions | Not started |
 | 2 | Scoring rules per user | Not started |
 | 3 | Job sources and validation | Not started |

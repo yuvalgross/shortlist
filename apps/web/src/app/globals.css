@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* Palette from the approved mockups. Fonts get wired in with the UI gates. */
+:root {
+  --background: #f7f6f3;
+  --surface: #ffffff;
+  --foreground: #16181d;
+  --muted: #4a4d55;
+  --border: #e2e0da;
+  --accent: #0e5e4f;
+  --accent-soft: #eef6f3;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-line: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
