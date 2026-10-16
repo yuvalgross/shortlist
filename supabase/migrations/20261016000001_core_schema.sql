@@ -2,7 +2,8 @@
 -- Every table that holds a user's data carries user_id and is locked with row level security.
 -- Shared tables (companies, sources, jobs) are readable by signed in users and written only by the worker (service role).
 
-create extension if not exists vector;
+create schema if not exists extensions;
+create extension if not exists vector with schema extensions;
 
 -- ---------------------------------------------------------------------------
 -- Enums
@@ -111,7 +112,7 @@ create table public.stories (
   status             public.fact_status not null default 'confirmed',
   source_type        public.fact_source not null default 'user',
   source_quote       text,
-  embedding          vector(1024),
+  embedding          extensions.vector(1024),
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
 );
@@ -227,7 +228,7 @@ create table public.jobs (
   status           public.job_status not null default 'unverified',
   content_hash     text,
   found_via        text[] not null default '{}',
-  embedding        vector(1024)
+  embedding        extensions.vector(1024)
 );
 create unique index jobs_company_external_uq on public.jobs (company_id, external_id);
 

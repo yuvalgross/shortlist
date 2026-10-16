@@ -26,7 +26,7 @@ Status: waiting for approval. Approve by merging the Gate 0 pull request.
 
 ## Test results
 
-**Database and isolation** (`supabase/tests`, embedded Postgres 17 with pgvector): 11 of 11 passed.
+**Database and isolation** (`supabase/tests`, embedded Postgres 17 with pgvector, all 4 migrations): 11 of 11 passed.
 
 | Test | Result |
 |---|---|
@@ -48,11 +48,25 @@ Status: waiting for approval. Approve by merging the Gate 0 pull request.
 
 **Worker:** 3 of 3 tests pass. `check` reports a missing setting or an unreachable database clearly instead of crashing.
 
-## Not verified yet (needs your Supabase project)
+## Live Supabase project (shortlist, eu-west-1 Ireland)
 
+Applied on Oct 16 2026: all 4 migration files.
+
+| Check on the live database | Result |
+|---|---|
+| Row level security on and enforced | 22 of 22 tables |
+| Signed out visitors can read | 0 of 22 tables |
+| Storage buckets and policies | 2 private buckets, 5 policies |
+| pgvector | 0.8.2, in the `extensions` schema |
+| Supabase security advisor | 2 warnings. Fixed: trigger function search path (migration 4). Kept on purpose: `set_scoring_config` can be called by signed in users, because it is the only way to change scoring and it validates every value and writes only the caller's rows |
+
+GitHub checks on this pull request: database, web and worker all pass (the first run caught a missing type generation step, fixed in the second commit).
+
+## Not verified yet
+
+- The isolation test on the live database. It needs two temporary test users and was cancelled before running; the same 11 tests pass on embedded Postgres 17. I can run it once you approve the temporary write (it rolls back and leaves nothing).
 - A real sign in link email, and the full sign in round trip.
-- Storage policies on Supabase's real storage service. The tests use a stand in with the same policy logic.
-- The checks running on GitHub. They run once the pull request is open.
+- Storage policies on Supabase's real storage service, with a real upload. Comes with Gate 1's CV upload.
 
 ## Decisions I made that you may want to change
 
@@ -64,8 +78,8 @@ Status: waiting for approval. Approve by merging the Gate 0 pull request.
 
 ## What you need to do to finish Gate 0
 
-1. Supabase project in Frankfurt (eu-central-1), if not done.
-2. Run the three migration files in order in the Supabase SQL editor (or `supabase db push`).
+1. ~~Supabase project~~ done (eu-west-1 Ireland, still EU).
+2. ~~Run the migrations~~ done through the Supabase connector.
 3. Authentication > URL configuration: add `http://localhost:3000/auth/callback` and your Vercel address plus `/auth/callback`.
 4. Vercel: new project from this repo, root directory `apps/web`, environment variables from `apps/web/.env.example`.
 5. Sign in once with your email and tell me it worked, or what you saw.
