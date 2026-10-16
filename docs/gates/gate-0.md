@@ -62,10 +62,13 @@ Applied on Oct 16 2026: all 4 migration files.
 
 GitHub checks on this pull request: database, web and worker all pass (the first run caught a missing type generation step, fixed in the second commit).
 
+## Verified by Yuval (Oct 16 2026, 14:42)
+
+Sign in link email received from Supabase; clicking it signed in on the Vercel preview and showed "Signed in as gross.yuval@gmail.com" with "No profile yet". Supabase URL configuration set (site URL plus preview, production and localhost redirects).
+
 ## Not verified yet
 
 - The isolation test on the live database. It needs two temporary test users and was cancelled before running; the same 11 tests pass on embedded Postgres 17. I can run it once you approve the temporary write (it rolls back and leaves nothing).
-- A real sign in link email, and the full sign in round trip.
 - Storage policies on Supabase's real storage service, with a real upload. Comes with Gate 1's CV upload.
 
 ## Decisions I made that you may want to change
