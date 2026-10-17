@@ -8,9 +8,9 @@ Every component arrives as one pull request, a "gate". Nothing moves on until th
 
 | Gate | Component | Status |
 |---|---|---|
-| 0 | Foundation: schema, data isolation, login, repo layout | In review (PR #1) |
-| 1 | Profile from CV: upload, parsing, skills, priorities, suggestions | Not started |
-| 2 | Scoring rules per user | Not started |
+| 0 | Foundation: schema, data isolation, login, repo layout | Approved (PR #1) |
+| 1 | Profile from CV: upload, parsing, skills, proof bank, suggestions | In review (PR #2) |
+| 2 | Scoring rules per user, target titles and priorities | Not started |
 | 3 | Job sources and validation | Not started |
 | 4 | Job updates (digest) | Not started |
 | 5 | CV tailoring on the template | Not started |
@@ -33,7 +33,7 @@ docs/reference/      What the scheduled task does today: the spec each gate is m
 
 ```
 cd supabase/tests && npm ci && npm test     # database and isolation
-cd apps/web && npm ci && npm run build      # web app (needs the env vars from .env.example)
+cd apps/web && npm ci && npm test && npm run build   # web app (needs the env vars from .env.example)
 cd worker && pip install -e ".[dev]" && pytest -q
 ```
 
