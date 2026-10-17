@@ -50,12 +50,20 @@ The web tests use a fictional CV (Mara Lindqvist, PDF and Word) with a model ans
 
 ## Live database
 
-Not applied yet. The connector asked for approval and the request was cancelled. Once you approve, I apply `cv_parsing` and rerun the security advisor. Current advisor state: 1 intended warning (`set_scoring_config`, from Gate 0). Leaked password protection doesn't apply because sign in is by email link. The three new functions will add 3 warnings of the same intended kind.
+Applied on Oct 18 2026. Yuval ran the migration file in the Supabase SQL editor, because the connector's approval prompt kept cancelling.
+
+| Check on the live database | Result |
+|---|---|
+| New upload columns | 8 of 8 |
+| New columns on roles, skills and stories | 5 of 5 |
+| Status check on uploads | present |
+| The 3 new functions | signed in users can call them, signed out visitors can't |
+| Supabase security advisor | 4 warnings, all intended: the 3 new functions plus `set_scoring_config`. Each one writes only the caller's own rows. Leaked password protection doesn't apply, since sign in is by email link |
 
 ## What you need to do
 
-1. **Approve the database change** when I ask (one click).
-2. **Add the API key in Vercel:**
+1. ~~Database change~~ done.
+2. ~~API key in Vercel~~ done, preview redeployed with it. Steps kept for reference:
    - Project shortlist > Settings > Environment Variables > Add.
    - Name `ANTHROPIC_API_KEY`, value from console.anthropic.com > API Keys.
    - Tick Sensitive, then Production and Preview. Save.
