@@ -82,7 +82,7 @@ Still not proven: a real CV read on Vercel end to end. That needs one "Try again
 
 ## Live database
 
-Migration `cv_parsing` applied on Oct 18 2026. Yuval ran the file in the Supabase SQL editor, because the connector's approval prompt kept cancelling. Migration `audit_fixes` is waiting to be applied the same way (see below).
+Migration `cv_parsing` applied on Oct 18 2026. Yuval ran the file in the Supabase SQL editor, because the connector's approval prompt kept cancelling. Migration `audit_fixes` applied the same way on Oct 18 2026, 20:26. Checked afterwards: 5 of 5 scoring bounds, 3 of 3 profile list checks, 12 of 12 new indexes, 2 of 2 new triggers, the pending only suggestion policy, all three rewritten functions, and the cleanup function not callable by users. Security advisor unchanged (the same 4 intended warnings); performance advisor lists only indexes not used yet, expected with an almost empty database.
 
 | Check on the live database | Result |
 |---|---|
@@ -94,7 +94,7 @@ Migration `cv_parsing` applied on Oct 18 2026. Yuval ran the file in the Supabas
 
 ## What you need to do
 
-1. ~~Database change `cv_parsing`~~ done. **Database change `audit_fixes`: still to run** (copy `supabase/migrations/20261018000002_audit_fixes.sql` into the SQL editor and press Run).
+1. ~~Database change `cv_parsing`~~ done. ~~Database change `audit_fixes`~~ done.
 2. ~~API key in Vercel~~ done, preview redeployed with it. Steps kept for reference:
    - Project shortlist > Settings > Environment Variables > Add.
    - Name `ANTHROPIC_API_KEY`, value from console.anthropic.com > API Keys.
