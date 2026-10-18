@@ -1,43 +1,47 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { signOut } from "../login/actions";
+import Link from "next/link";
+import { requireUser } from "@/lib/supabase/user";
+import { Card, PageTitle, Tag } from "@/components/ui";
 
-// Signed in home. Gate 0 only proves login and data isolation work end to end;
-// onboarding (Gate 1) and the review queue come later.
 export default function AppHome() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-12">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Shortlist</h1>
-        <form action={signOut}>
-          <button type="submit" className="rounded-lg border border-line px-4 py-2.5 text-sm">
-            Sign out
-          </button>
-        </form>
-      </div>
-      <Suspense fallback={<section className="rounded-xl border border-line bg-surface p-6 text-muted">Loading…</section>}>
-        <Account />
-      </Suspense>
-    </main>
+    <Suspense fallback={<p className="text-muted">Loading…</p>}>
+      <Home />
+    </Suspense>
   );
 }
 
-async function Account() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-  const claims = data?.claims;
-  if (!claims?.sub) redirect("/login");
-
-  // Reads through row level security: returns this user's row or nothing.
-  const { data: profile } = await supabase.from("profiles").select("full_name").maybeSingle();
-
+async function Home() {
+  const { supabase, email } = await requireUser();
+  const [{ data: upload }, { count: stories }, { count: withNumber }, { count: claims }] = await Promise.all([
+    supabase.from("cv_uploads").select("parse_status").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("stories").select("id", { count: "exact", head: true }).eq("status", "confirmed"),
+    supabase.from("stories").select("id", { count: "exact", head: true }).eq("status", "confirmed").not("result_metric", "is", null),
+    supabase.from("not_on_record").select("id", { count: "exact", head: true }),
+  ]);
+  const status = upload?.parse_status as string | undefined;
+  const items = [
+    { href: "/app/upload", title: "Upload your CV", done: Boolean(status), note: status ? `Last upload: ${status}` : "Not done yet" },
+    { href: "/app/profile", title: "Check your profile", done: status === "confirmed", note: status === "parsed" ? "Waiting for your review" : status === "confirmed" ? "Confirmed" : "After the upload" },
+    { href: "/app/proof", title: "Complete your proof bank", done: (stories ?? 0) > 0 && withNumber === stories, note: `${withNumber ?? 0} of ${stories ?? 0} results have a number` },
+    { href: "/app/proof", title: "Not on your record", done: (claims ?? 0) > 0, note: `${claims ?? 0} items` },
+  ];
   return (
-    <section className="rounded-xl border border-line bg-surface p-6">
-      <p className="text-muted">Signed in as {String(claims.email ?? "")}</p>
-      <p className="mt-2">
-        {profile?.full_name ? `Profile found for ${profile.full_name}.` : "No profile yet. Onboarding arrives in Gate 1."}
-      </p>
-    </section>
+    <>
+      <PageTitle sub={`Signed in as ${email}. Job targets, scoring and the daily queue arrive in the next gates.`}>Set up your profile</PageTitle>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {items.map((i) => (
+          <Link key={i.title} href={i.href}>
+            <Card className="flex h-full flex-col gap-2 hover:border-accent">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="font-semibold">{i.title}</h2>
+                {i.done ? <Tag tone="ok">DONE</Tag> : <Tag tone="muted">TO DO</Tag>}
+              </div>
+              <p className="text-sm text-muted">{i.note}</p>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </>
   );
 }

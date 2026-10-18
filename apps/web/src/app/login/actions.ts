@@ -22,7 +22,11 @@ export async function sendMagicLink(formData: FormData) {
     email,
     options: { emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}` },
   });
-  redirect(error ? "/login?error=send" : "/login?sent=1");
+  if (error) {
+    const limited = error.code === "over_email_send_rate_limit" || error.status === 429;
+    redirect(limited ? "/login?error=limit" : "/login?error=send");
+  }
+  redirect("/login?sent=1");
 }
 
 export async function signOut() {

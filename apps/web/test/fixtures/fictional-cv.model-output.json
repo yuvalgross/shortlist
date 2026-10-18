@@ -1,0 +1,96 @@
+{
+  "_note": "Recorded-style model answer for fictional-cv.pdf with planted mistakes. Each PLANTED item must be caught by verify.ts.",
+  "full_name": "Mara Lindqvist",
+  "headline": "Revenue Operations Manager",
+  "location": "Amsterdam, Netherlands",
+  "phone": "+31 6 1234 5678",
+  "email": "mara.lindqvist@example.com",
+  "links": [
+    { "label": "LinkedIn", "url": "linkedin.com/in/mara-lindqvist-example" },
+    { "label": "Portfolio", "url": "https://mara-portfolio.example.com" }
+  ],
+  "languages": [
+    { "language": "Swedish", "level": "native" },
+    { "language": "English", "level": "fluent" },
+    { "language": "Dutch", "level": "B2" }
+  ],
+  "education": [{ "school": "University of Amsterdam", "degree": "MSc Business Analytics", "year": "2018" }],
+  "certifications": "",
+  "experiences": [
+    {
+      "title": "Revenue Operations Manager",
+      "company": "Northwind Analytics",
+      "company_desc": "",
+      "location": "Amsterdam",
+      "work_mode": "hybrid",
+      "employment_type": "",
+      "start": "2022-03",
+      "end": "present",
+      "header_quote": "Amsterdam, hybrid | March 2022 to present",
+      "results": [
+        { "label": "Forecast accuracy", "metric": "forecast error cut from 18% to 7%", "quote": "Rebuilt the Salesforce opportunity stages and cut forecast error from 18% to 7% in two quarters." },
+        { "label": "Territory planning", "metric": "32 account executives", "quote": "Designed territory planning for 32 account executives across Benelux and DACH." },
+        { "label": "Reporting", "metric": "replaced 20 spreadsheets", "quote": "Moved pipeline reporting into Snowflake and Looker, replacing 14 manual spreadsheets." },
+        { "label": "QBR process", "metric": "", "quote": "Ran the quarterly business review process with sales and finance leadership." },
+        { "label": "Leadership", "metric": "", "quote": "Led a team of five analysts and hired the first data engineer." }
+      ]
+    },
+    {
+      "title": "Sales Operations Analyst",
+      "company": "Blue Harbor Software",
+      "company_desc": "",
+      "location": "Rotterdam",
+      "work_mode": "unknown",
+      "employment_type": "",
+      "start": "2019-01",
+      "end": "2021-02",
+      "header_quote": "Rotterdam | January 2019 to February 2022",
+      "results": [
+        { "label": "Lead routing", "metric": "3 inbound teams", "quote": "Owned lead routing rules in Salesforce for 3 inbound teams." },
+        { "label": "Commissions", "metric": "45 sellers", "quote": "Built the commission calculation model used for 45 sellers." }
+      ]
+    },
+    {
+      "title": "Junior Analyst",
+      "company": "Delta Retail Group",
+      "company_desc": "",
+      "location": "Utrecht",
+      "work_mode": "unknown",
+      "employment_type": "",
+      "start": "",
+      "end": "",
+      "header_quote": "Junior Analyst, Delta Retail Group",
+      "results": [
+        { "label": "Dashboards", "metric": "", "quote": "Prepared weekly sales dashboards for regional managers." }
+      ]
+    },
+    {
+      "title": "Head of Revenue Operations",
+      "company": "Acme Cloud",
+      "company_desc": "",
+      "location": "",
+      "work_mode": "unknown",
+      "employment_type": "",
+      "start": "2017",
+      "end": "2018",
+      "header_quote": "Head of Revenue Operations, Acme Cloud",
+      "results": []
+    }
+  ],
+  "skills": [
+    { "name": "Salesforce", "category": "tool", "quote": "Salesforce, HubSpot, Looker, Excel, forecasting, territory planning, commission planning" },
+    { "name": "HubSpot", "category": "tool", "quote": "Salesforce, HubSpot, Looker, Excel, forecasting, territory planning, commission planning" },
+    { "name": "Looker", "category": "tool", "quote": "Salesforce, HubSpot, Looker, Excel, forecasting, territory planning, commission planning" },
+    { "name": "Excel", "category": "tool", "quote": "Salesforce, HubSpot, Looker, Excel, forecasting, territory planning, commission planning" },
+    { "name": "forecasting", "category": "method", "quote": "Salesforce, HubSpot, Looker, Excel, forecasting, territory planning, commission planning" },
+    { "name": "territory planning", "category": "method", "quote": "Salesforce, HubSpot, Looker, Excel, forecasting, territory planning, commission planning" },
+    { "name": "commission planning", "category": "method", "quote": "Salesforce, HubSpot, Looker, Excel, forecasting, territory planning, commission planning" },
+    { "name": "Tableau", "category": "tool", "quote": "Salesforce, HubSpot, Looker, Tableau, Excel" }
+  ],
+  "suggestions": [
+    { "kind": "skill", "name": "Snowflake", "category": "tool", "experience_index": -1, "ats_title": "", "reason": "You used Snowflake for pipeline reporting but it is not in your skills list.", "quote": "Moved pipeline reporting into Snowflake and Looker, replacing 14 manual spreadsheets." },
+    { "kind": "skill", "name": "Looker", "category": "tool", "experience_index": -1, "ats_title": "", "reason": "Duplicate of an existing skill.", "quote": "Moved pipeline reporting into Snowflake and Looker, replacing 14 manual spreadsheets." },
+    { "kind": "title", "name": "Revenue Operations Manager", "category": "other", "experience_index": 0, "ats_title": "Senior Revenue Operations Manager", "reason": "More common title.", "quote": "Revenue Operations Manager, Northwind Analytics" },
+    { "kind": "title", "name": "Junior Analyst", "category": "other", "experience_index": 2, "ats_title": "Junior Sales Analyst", "reason": "Recruiters search for Sales Analyst.", "quote": "Junior Analyst, Delta Retail Group" }
+  ]
+}

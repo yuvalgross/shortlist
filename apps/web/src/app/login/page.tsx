@@ -4,6 +4,7 @@ import { sendMagicLink } from "./actions";
 const messages: Record<string, string> = {
   email: "Enter a valid email address.",
   send: "We couldn't send the link. Try again in a minute.",
+  limit: "Too many sign in emails were sent in the last hour. Use the link in your most recent email, or try again later.",
   link: "That sign in link has expired or was already used. Request a new one.",
 };
 
