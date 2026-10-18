@@ -1,11 +1,12 @@
 import { Suspense } from "react";
-import { sendMagicLink } from "./actions";
+import { quickSignIn, quickSignInEnabled, sendMagicLink } from "./actions";
 
 const messages: Record<string, string> = {
   email: "Enter a valid email address.",
   send: "We couldn't send the link. Try again in a minute.",
   limit: "Too many sign in emails were sent in the last hour. Use the link in your most recent email, or try again later.",
   link: "That sign in link has expired or was already used. Request a new one.",
+  quick: "Skip sign in did not work. Use the email link instead.",
 };
 
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -46,6 +47,12 @@ async function LoginForm({ searchParams }: { searchParams: PageProps<"/login">["
       <button type="submit" className="rounded-lg bg-accent px-4 py-3 font-medium text-white">
         Email me a sign in link
       </button>
+      {/* TEMPORARY: testing shortcut, see quickSignIn in actions.ts */}
+      {quickSignInEnabled() && (
+        <button formAction={quickSignIn} formNoValidate className="rounded-lg border border-line px-4 py-3 text-sm">
+          Skip sign in (temporary)
+        </button>
+      )}
     </form>
   );
 }
