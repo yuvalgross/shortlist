@@ -7,15 +7,19 @@ import { scheduleParse } from "@/lib/cv/start";
 
 const str = (f: FormData, k: string, max = 300) => String(f.get(k) ?? "").trim().slice(0, max);
 const month = (v: string) => (/^\d{4}-\d{2}$/.test(v) ? `${v}-01` : null);
+const UNIQUE_VIOLATION = "23505";
 
-// Something went wrong while saving: send the user back with a message instead of a silent refresh.
-const fail = (): never => redirect("/app/profile?error=save");
+// Every change below is limited to the signed in user's own rows by row level security.
+// When the database refuses a change, the user gets a message instead of a page that silently looks the same.
+function done(error: { message: string; code?: string } | null, ignoreCode?: string) {
+  if (error && error.code !== ignoreCode) redirect("/app/profile?error=save");
+  refresh();
+}
 
 export async function retryParse(formData: FormData) {
   const { supabase } = await requireUser();
   const started = await scheduleParse(supabase, str(formData, "upload_id"));
-  if (!started) fail();
-  refresh();
+  done(started ? null : { message: "upload cannot be read" });
 }
 
 export async function updateBasics(formData: FormData) {
@@ -26,8 +30,7 @@ export async function updateBasics(formData: FormData) {
     headline: str(formData, "headline") || null,
     location: str(formData, "location") || null,
   });
-  if (error) fail();
-  refresh();
+  done(error);
 }
 
 export async function updateExperience(formData: FormData) {
@@ -46,56 +49,53 @@ export async function updateExperience(formData: FormData) {
       source_type: "user",
     })
     .eq("id", str(formData, "id"));
-  if (error) fail();
-  refresh();
+  done(error);
 }
 
 export async function deleteExperience(formData: FormData) {
   const { supabase } = await requireUser();
   const id = str(formData, "id");
+  // unreviewed results go with the role; confirmed ones stay (the database unlinks them)
   await supabase.from("stories").delete().eq("experience_id", id).eq("status", "suggested");
-  await supabase.from("experiences").delete().eq("id", id);
-  refresh();
+  const { error } = await supabase.from("experiences").delete().eq("id", id);
+  done(error);
 }
 
 export async function deleteStory(formData: FormData) {
   const { supabase } = await requireUser();
-  await supabase.from("stories").delete().eq("id", str(formData, "id"));
-  refresh();
+  const { error } = await supabase.from("stories").delete().eq("id", str(formData, "id"));
+  done(error);
 }
 
 export async function addSkill(formData: FormData) {
   const { supabase, userId } = await requireUser();
   const name = str(formData, "name", 80);
+  if (!name) return refresh();
   // A duplicate (same name, any capitalisation) is refused by the database and simply ignored here.
-  if (name) {
-    const { error } = await supabase.from("skills").insert({ user_id: userId, name, status: "confirmed", source_type: "user" });
-    if (error && error.code !== "23505") fail();
-  }
-  refresh();
+  const { error } = await supabase.from("skills").insert({ user_id: userId, name, status: "confirmed", source_type: "user" });
+  done(error, UNIQUE_VIOLATION);
 }
 
 export async function removeSkill(formData: FormData) {
   const { supabase } = await requireUser();
-  await supabase.from("skills").delete().eq("id", str(formData, "id"));
-  refresh();
+  const { error } = await supabase.from("skills").delete().eq("id", str(formData, "id"));
+  done(error);
 }
 
 export async function acceptSuggestion(formData: FormData) {
   const { supabase } = await requireUser();
   const { error } = await supabase.rpc("accept_suggestion", { p_id: str(formData, "id") });
-  if (error) fail();
-  refresh();
+  done(error);
 }
 
 export async function rejectSuggestion(formData: FormData) {
   const { supabase } = await requireUser();
-  await supabase
+  const { error } = await supabase
     .from("suggestions")
     .update({ status: "rejected", decided_at: new Date().toISOString() })
     .eq("id", str(formData, "id"))
     .eq("status", "pending");
-  refresh();
+  done(error);
 }
 
 export async function confirmProfile(formData: FormData) {
