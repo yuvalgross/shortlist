@@ -11,16 +11,17 @@ export const DEFAULT_PARSE_MODEL = "claude-sonnet-5-5";
 
 // The real call to the matching model. Only runs on the server; the key never reaches the browser.
 // 16k output tokens is several times what a long CV needs. Above about 21k the SDK refuses a plain request.
-// The timeout keeps the call inside the 300 second limit of the Vercel function that runs it.
+// One attempt of at most 240 seconds, no automatic retry: a retry would push the worst case past the
+// 300 second limit of the Vercel function, and the function would be killed before it could mark the upload failed.
 export const PARSE_MAX_TOKENS = 16000;
-const PARSE_TIMEOUT_MS = 240_000;
+export const PARSE_TIMEOUT_MS = 240_000;
 
 export function claudeModelCall(
   apiKey: string,
   model = process.env.CV_PARSE_MODEL || DEFAULT_PARSE_MODEL,
   fetchImpl?: typeof fetch,
 ): ModelCall {
-  const client = new Anthropic({ apiKey, timeout: PARSE_TIMEOUT_MS, maxRetries: 1, ...(fetchImpl ? { fetch: fetchImpl } : {}) });
+  const client = new Anthropic({ apiKey, timeout: PARSE_TIMEOUT_MS, maxRetries: 0, ...(fetchImpl ? { fetch: fetchImpl } : {}) });
   return async (cvText) => {
     const res = await client.messages.parse({
       model,

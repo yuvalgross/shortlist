@@ -8,38 +8,45 @@ import { scheduleParse } from "@/lib/cv/start";
 const str = (f: FormData, k: string, max = 300) => String(f.get(k) ?? "").trim().slice(0, max);
 const month = (v: string) => (/^\d{4}-\d{2}$/.test(v) ? `${v}-01` : null);
 
+// Something went wrong while saving: send the user back with a message instead of a silent refresh.
+const fail = (): never => redirect("/app/profile?error=save");
+
 export async function retryParse(formData: FormData) {
   const { supabase } = await requireUser();
-  await scheduleParse(supabase, str(formData, "upload_id"));
+  const started = await scheduleParse(supabase, str(formData, "upload_id"));
+  if (!started) fail();
   refresh();
 }
 
 export async function updateBasics(formData: FormData) {
   const { supabase, userId } = await requireUser();
-  await supabase.from("profiles").upsert({
+  const { error } = await supabase.from("profiles").upsert({
     user_id: userId,
     full_name: str(formData, "full_name") || null,
     headline: str(formData, "headline") || null,
     location: str(formData, "location") || null,
   });
+  if (error) fail();
   refresh();
 }
 
 export async function updateExperience(formData: FormData) {
   const { supabase } = await requireUser();
   const current = formData.get("is_current") === "on";
-  await supabase
+  const { error } = await supabase
     .from("experiences")
     .update({
       title: str(formData, "title") || "Untitled role",
       company: str(formData, "company") || "Unknown company",
-      location: str(formData, "location") || null,
+      // only touch fields the form actually sent, so a form without a location box keeps the location
+      ...(formData.has("location") ? { location: str(formData, "location") || null } : {}),
       start_date: month(str(formData, "start")),
       end_date: current ? null : month(str(formData, "end")),
       is_current: current,
       source_type: "user",
     })
     .eq("id", str(formData, "id"));
+  if (error) fail();
   refresh();
 }
 
@@ -61,7 +68,10 @@ export async function addSkill(formData: FormData) {
   const { supabase, userId } = await requireUser();
   const name = str(formData, "name", 80);
   // A duplicate (same name, any capitalisation) is refused by the database and simply ignored here.
-  if (name) await supabase.from("skills").insert({ user_id: userId, name, status: "confirmed", source_type: "user" });
+  if (name) {
+    const { error } = await supabase.from("skills").insert({ user_id: userId, name, status: "confirmed", source_type: "user" });
+    if (error && error.code !== "23505") fail();
+  }
   refresh();
 }
 
@@ -73,7 +83,8 @@ export async function removeSkill(formData: FormData) {
 
 export async function acceptSuggestion(formData: FormData) {
   const { supabase } = await requireUser();
-  await supabase.rpc("accept_suggestion", { p_id: str(formData, "id") });
+  const { error } = await supabase.rpc("accept_suggestion", { p_id: str(formData, "id") });
+  if (error) fail();
   refresh();
 }
 

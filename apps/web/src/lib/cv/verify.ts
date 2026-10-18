@@ -61,6 +61,21 @@ export function conflictingClaim(name: string, claims: string[]): string | null 
   return null;
 }
 
+// The stretch of CV text around a role's title (and company, when it sits close by): where its dates should be.
+export function aroundTitle(cv: string, title: string, company: string, span = 160): string {
+  let at = -1;
+  if (title) {
+    let from = 0;
+    while ((at = cv.indexOf(title, from)) !== -1) {
+      if (!company || cv.slice(Math.max(0, at - span), at + title.length + span).includes(company)) break;
+      from = at + 1;
+    }
+  }
+  if (at === -1 && company) at = cv.indexOf(company);
+  if (at === -1) return "";
+  return cv.slice(Math.max(0, at - span), at + title.length + span);
+}
+
 export function toDate(value: string, now = new Date()): string | null {
   const v = value.trim();
   const m = /^(\d{4})(?:-(\d{1,2}))?$/.exec(v);
@@ -125,9 +140,13 @@ export function verifyParse(raw: RawParse, cvText: string, notOnRecord: string[]
     if (!e.title.trim() || !inCv(e.title)) return drop(label, "title not found in the CV");
     if (!e.company.trim() || !inCv(e.company)) return drop(label, "company not found in the CV");
 
-    const header = inCv(e.header_quote) ? normalize(e.header_quote) : cv;
+    // The role's own line in the CV. If the model's line is not in the CV it is not shown to the user,
+    // and dates are then checked against the text around the job title instead of the whole CV.
+    const headerOk = inCv(e.header_quote);
+    if (e.header_quote.trim() && !headerOk) drop(`${label} line "${e.header_quote.slice(0, 80)}"`, "not found in the CV");
+    const header = headerOk ? normalize(e.header_quote) : aroundTitle(cv, normalize(e.title), normalize(e.company));
     const date = (value: string, which: string) => {
-      if (!value || value === "present") return "";
+      if (!value || value.trim().toLowerCase() === "present") return "";
       const d = toDate(value, now);
       if (!d) {
         drop(`${label} ${which} date "${value}"`, "not a valid date");
@@ -142,7 +161,10 @@ export function verifyParse(raw: RawParse, cvText: string, notOnRecord: string[]
 
     const results: ParsePayload["experiences"][number]["results"] = [];
     for (const r of e.results) {
-      if (results.length >= LIMITS.results) break;
+      if (results.length >= LIMITS.results) {
+        drop(`result under ${label}: ${r.quote.slice(0, 80)}`, `too many results for one role (limit ${LIMITS.results})`);
+        continue;
+      }
       if (!inCv(r.quote)) {
         drop(`result under ${label}: ${r.quote.slice(0, 80)}`, "quote not found in the CV");
         continue;
@@ -171,7 +193,7 @@ export function verifyParse(raw: RawParse, cvText: string, notOnRecord: string[]
       start_date: date(e.start, "start"),
       end_date: date(e.end, "end"),
       is_current: e.end.trim().toLowerCase() === "present",
-      quote: e.header_quote.trim(),
+      quote: headerOk ? e.header_quote.trim() : "",
       results,
     });
   });
@@ -182,7 +204,10 @@ export function verifyParse(raw: RawParse, cvText: string, notOnRecord: string[]
   for (const s of raw.skills) {
     const key = normalize(s.name);
     if (!key || seen.has(key)) continue;
-    if (skills.length >= LIMITS.skills) break;
+    if (skills.length >= LIMITS.skills) {
+      drop(`skill: ${s.name}`, `too many skills (limit ${LIMITS.skills})`);
+      continue;
+    }
     if (!inCv(s.name) || !inCv(s.quote) || !normalize(s.quote).includes(key)) {
       drop(`skill: ${s.name}`, "not found in the CV");
       continue;
@@ -199,7 +224,10 @@ export function verifyParse(raw: RawParse, cvText: string, notOnRecord: string[]
   // Suggestions
   const suggestions: ParsePayload["suggestions"] = [];
   for (const sg of raw.suggestions) {
-    if (suggestions.length >= LIMITS.suggestions) break;
+    if (suggestions.length >= LIMITS.suggestions) {
+      drop(`suggestion: ${sg.kind} ${sg.kind === "skill" ? sg.name : sg.ats_title}`, `too many suggestions (limit ${LIMITS.suggestions})`);
+      continue;
+    }
     if (!inCv(sg.quote)) {
       drop(`suggestion: ${sg.kind} ${sg.name}`, "quote not found in the CV");
       continue;

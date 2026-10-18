@@ -10,9 +10,15 @@ export async function saveStory(formData: FormData) {
   const { supabase, userId } = await requireUser();
   const id = str(formData, "id");
   const metric = str(formData, "result_metric", 200);
+  // A story may only point at one of the user's own roles. Anything else becomes "no role".
+  let experienceId: string | null = str(formData, "experience_id") || null;
+  if (experienceId) {
+    const { data: own } = await supabase.from("experiences").select("id").eq("id", experienceId).maybeSingle();
+    if (!own) experienceId = null;
+  }
   const row = {
     title: str(formData, "title", 120) || "Untitled story",
-    experience_id: str(formData, "experience_id") || null,
+    experience_id: experienceId,
     situation: str(formData, "situation") || null,
     task: str(formData, "task") || null,
     action: str(formData, "action") || null,
@@ -23,15 +29,17 @@ export async function saveStory(formData: FormData) {
   };
   if (id) {
     // Editing a story is the user's own statement of fact, so it counts as confirmed.
-    await supabase.from("stories").update({ ...row, status: "confirmed" }).eq("id", id);
+    const { error } = await supabase.from("stories").update({ ...row, status: "confirmed" }).eq("id", id);
+    if (error) redirect(`/app/proof?story=${id}&error=save`);
     redirect(`/app/proof?story=${id}&saved=1`);
   }
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("stories")
     .insert({ ...row, user_id: userId, status: "confirmed", source_type: "user" })
     .select("id")
     .single();
-  redirect(`/app/proof?story=${data?.id ?? ""}&saved=1`);
+  if (error || !data) redirect("/app/proof?story=new&error=save");
+  redirect(`/app/proof?story=${data.id}&saved=1`);
 }
 
 export async function deleteStory(formData: FormData) {

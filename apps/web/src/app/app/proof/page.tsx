@@ -69,6 +69,7 @@ async function Proof({ searchParams }: { searchParams: PageProps<"/app/proof">["
 
         <Card className="flex flex-col gap-4">
           {params.saved === "1" && <p className="text-sm text-[#0a4a3e]" aria-live="polite">Saved.</p>}
+          {params.error === "save" && <p role="alert" className="text-sm text-red-800">Saving failed. Try again.</p>}
           {selected?.source_quote && <p className="font-mono text-xs text-muted">From your CV: &ldquo;{selected.source_quote}&rdquo;</p>}
           <form action={saveStory} className="flex flex-col gap-4" key={selected?.id ?? "new"}>
             <input type="hidden" name="id" value={selected?.id ?? ""} />

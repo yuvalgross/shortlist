@@ -15,8 +15,14 @@ export async function requireUser() {
 
 // A client that keeps acting as this user after the response has been sent (background CV reading).
 // It carries the user's own access token, so it can only reach this user's rows and files.
-export async function backgroundClientFor(supabase: SupabaseClient): Promise<SupabaseClient> {
-  const { data } = await supabase.auth.getSession();
+// If the token would expire within `minSecondsLeft`, it is refreshed first, so a long job does not lose access halfway.
+export async function backgroundClientFor(supabase: SupabaseClient, minSecondsLeft = 0): Promise<SupabaseClient> {
+  let { data } = await supabase.auth.getSession();
+  const expiresAt = data.session?.expires_at ?? 0;
+  if (data.session && expiresAt - Math.floor(Date.now() / 1000) < minSecondsLeft) {
+    const refreshed = await supabase.auth.refreshSession();
+    if (refreshed.data.session) data = refreshed.data;
+  }
   const token = data.session?.access_token;
   if (!token) throw new Error("No session token for background work");
   const { url, key } = supabaseEnv();

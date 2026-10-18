@@ -25,9 +25,8 @@ export async function proxy(request: NextRequest) {
   const signedIn = Boolean(data?.claims?.sub);
 
   if (!signedIn && request.nextUrl.pathname.startsWith("/app")) {
-    const login = request.nextUrl.clone();
-    login.pathname = "/login";
-    login.searchParams.set("next", request.nextUrl.pathname);
+    const login = new URL("/login", request.url);
+    login.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.redirect(login);
   }
   return response;

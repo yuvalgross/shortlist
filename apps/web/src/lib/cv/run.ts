@@ -49,6 +49,7 @@ export async function runParse(db: SupabaseClient, uploadId: string, modelCall: 
   } catch (err) {
     const message = err instanceof UserFacingError ? err.message : "Something went wrong while reading your CV. Try again in a minute.";
     if (!(err instanceof UserFacingError)) console.error("CV parse failed", uploadId, err);
-    await db.from("cv_uploads").update({ parse_status: "failed", error: message }).eq("id", uploadId);
+    const { error: markError } = await db.from("cv_uploads").update({ parse_status: "failed", error: message }).eq("id", uploadId);
+    if (markError) console.error("CV parse failed and the status could not be updated", uploadId, markError.message);
   }
 }

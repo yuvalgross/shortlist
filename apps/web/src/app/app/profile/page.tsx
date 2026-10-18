@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/user";
+import { parseLooksStuck } from "@/lib/cv/status";
 import { Card, PageTitle, Steps, SuggestionCard, Tag, btn, field, label } from "@/components/ui";
 import type { ParseReport } from "@/lib/cv/verify";
 import { Poller } from "./poller";
@@ -53,6 +54,21 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
     );
   }
 
+  // Reading is capped at 5 minutes on the server. Past that the function was stopped before it could
+  // record a failure, so the page treats the upload as failed and offers a retry.
+  if (parseLooksStuck(upload)) {
+    return (
+      <Card className="flex flex-col gap-3">
+        <PageTitle>Reading {upload.file_name} took too long</PageTitle>
+        <p role="alert" className="text-red-800">The reading did not finish in time. Try again, or upload a different file.</p>
+        <div className="flex flex-wrap gap-3">
+          <RetryForm id={upload.id} />
+          <Link href="/app/upload" className={btn.secondary}>Upload a different file</Link>
+        </div>
+      </Card>
+    );
+  }
+
   if (upload.parse_status === "pending" || upload.parse_status === "parsing") {
     return (
       <Card className="flex flex-col gap-3">
@@ -100,7 +116,7 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
         <PageTitle sub="Every CV we write later starts from this profile, so wrong dates or titles here end up everywhere. Edit or delete anything that is off.">
           {toReview ? "Here is what we read. Fix anything that is off." : "Your profile"}
         </PageTitle>
-        {params.error === "confirm" && <p role="alert" className="text-red-800">Saving failed. Try again.</p>}
+        {(params.error === "confirm" || params.error === "save") && <p role="alert" className="text-red-800">Saving failed. Try again.</p>}
 
         <Card>
           <form action={updateBasics} className="grid gap-3 sm:grid-cols-3">
