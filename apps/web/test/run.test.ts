@@ -95,3 +95,30 @@ describe("reading an upload end to end", () => {
     expect(String(last.error)).not.toContain("overloaded");
   });
 });
+
+describe("problems with the matching model account", () => {
+  const withError = (status: number, message: string): ModelCall => async () => {
+    throw Object.assign(new Error(message), { status });
+  };
+  const run = async (call: ModelCall) => {
+    const { db, updates } = fakeDb(new Uint8Array(readFileSync(fx("fictional-cv.pdf"))));
+    const log = console.error;
+    console.error = () => {};
+    await runParse(db, "u1", call);
+    console.error = log;
+    return updates.at(-1)!;
+  };
+
+  it("no credit left: says reading is paused, not 'try again in a minute'", async () => {
+    const last = await run(withError(400, '400 {"error":{"message":"Your credit balance is too low to access the Anthropic API."}}'));
+    expect(last).toMatchObject({ parse_status: "failed", error: expect.stringContaining("paused") });
+  });
+
+  it("invalid key: same message", async () => {
+    expect((await run(withError(401, "invalid x-api-key"))).error).toContain("paused");
+  });
+
+  it("other errors keep the general message", async () => {
+    expect((await run(withError(529, "overloaded"))).error).toContain("Try again in a minute");
+  });
+});

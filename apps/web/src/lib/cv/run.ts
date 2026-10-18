@@ -7,6 +7,16 @@ import type { ModelCall } from "./model";
 
 export class UserFacingError extends Error {}
 
+// Problems with the matching model account rather than with the CV: retrying will not help until they are fixed.
+const PAUSED = "Reading CVs is paused right now because of a problem with the matching model account. Your file is saved; try again later.";
+export function accountProblem(err: unknown): string | null {
+  const e = err as { status?: number; message?: string } | null;
+  const text = String(e?.message ?? "").toLowerCase();
+  if (e?.status === 401 || e?.status === 403) return PAUSED;
+  if (e?.status === 400 && /credit balance|billing/.test(text)) return PAUSED;
+  return null;
+}
+
 export async function runParse(db: SupabaseClient, uploadId: string, modelCall: ModelCall | null): Promise<void> {
   try {
     const { data: upload, error } = await db
@@ -47,7 +57,8 @@ export async function runParse(db: SupabaseClient, uploadId: string, modelCall: 
     });
     if (saveError) throw new Error(`Saving the parse failed: ${saveError.message}`);
   } catch (err) {
-    const message = err instanceof UserFacingError ? err.message : "Something went wrong while reading your CV. Try again in a minute.";
+    const known = err instanceof UserFacingError ? err.message : accountProblem(err);
+    const message = known ?? "Something went wrong while reading your CV. Try again in a minute.";
     if (!(err instanceof UserFacingError)) console.error("CV parse failed", uploadId, err);
     const { error: markError } = await db.from("cv_uploads").update({ parse_status: "failed", error: message }).eq("id", uploadId);
     if (markError) console.error("CV parse failed and the status could not be updated", uploadId, markError.message);
