@@ -1,6 +1,6 @@
 # Gate 1: Profile from CV
 
-Status: waiting for approval. Two things only you can do are listed at the bottom; after those I run the live check and add the results here.
+Status: approved by Yuval and merged on Oct 18 2026 (PR #2).
 
 ## What this gate delivers
 
