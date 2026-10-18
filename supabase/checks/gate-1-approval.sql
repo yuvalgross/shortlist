@@ -26,7 +26,8 @@ select 1 as n, 'upload finished' as check_name,
        (select parse_status || coalesce(' / ' || error, '') || ' / model ' || coalesce(parse_model, '?') from up) as detail
 union all
 select 2, 'every saved fact quotes the CV word for word',
-       not exists (select 1 from facts, norm where facts.quote is null
+       -- a role may have no quote (its line was not found in the CV, so it is not shown); everything else needs one
+       not exists (select 1 from facts, norm where (facts.quote is null and facts.kind <> 'experience')
                    or position(lower(regexp_replace(translate(facts.quote, '•·', '  '), '\s+', ' ', 'g')) in norm.cv) = 0),
        (select count(*) || ' facts checked' from facts)
 union all

@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import { CV_PARSE_SYSTEM, cvParseUserMessage } from "./prompt";
 import { cvParseSchema, type RawParse } from "./schema";
+import { UserFacingError } from "./errors";
 
 export type ModelResult = { raw: RawParse; model: string; usage: { input_tokens: number; output_tokens: number } };
 export type ModelCall = (cvText: string) => Promise<ModelResult>;
@@ -31,7 +32,10 @@ export function claudeModelCall(
       output_config: { format: jsonSchemaOutputFormat(cvParseSchema, { transform: false }) },
     });
     if (res.stop_reason === "max_tokens") {
-      throw new Error("The matching model ran out of room before finishing the CV.");
+      // Retrying gives the same result, so say what to change instead of "try again".
+      throw new UserFacingError(
+        "This CV is too long to read in one go. Upload a shorter version (two pages at most) and try again.",
+      );
     }
     if (!res.parsed_output) {
       throw new Error(`The matching model returned no result (stop reason: ${res.stop_reason ?? "unknown"}).`);

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test isolation.test.mjs cv-parsing.test.mjs approval-check.test.mjs audit.test.mjs"
+    "test": "node --test isolation.test.mjs cv-parsing.test.mjs approval-check.test.mjs audit.test.mjs review.test.mjs"
   },
   "keywords": [],
   "author": "",
