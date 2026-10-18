@@ -46,10 +46,15 @@ const NUMBER_WORDS: Record<string, number> = {
   eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
   nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
 };
+const TENS = "twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety";
+const UNITS = "one|two|three|four|five|six|seven|eight|nine";
+const COMPOUND_RE = new RegExp(`\\b(${TENS})[- ](${UNITS})\\b`, "gi");
 const NUMBER_WORD_RE = new RegExp(`\\b(${Object.keys(NUMBER_WORDS).join("|")})\\b`, "gi");
 
 export function numbersIn(text: string): string[] {
-  const digits = text.replace(NUMBER_WORD_RE, (w) => String(NUMBER_WORDS[w.toLowerCase()]));
+  const digits = text
+    .replace(COMPOUND_RE, (_, t: string, u: string) => String(NUMBER_WORDS[t.toLowerCase()] + NUMBER_WORDS[u.toLowerCase()]))
+    .replace(NUMBER_WORD_RE, (w) => String(NUMBER_WORDS[w.toLowerCase()]));
   return (digits.match(/\d[\d,]*(?:\.\d+)?/g) ?? []).map((n) => n.replace(/,/g, "").replace(/\.0+$/, ""));
 }
 
@@ -76,6 +81,12 @@ export function conflictingClaim(name: string, claims: string[]): string | null 
     }
   }
   return null;
+}
+
+// The stretch of CV text around one piece of it.
+export function windowAround(cv: string, piece: string, span = 160): string {
+  const at = cv.indexOf(piece);
+  return at === -1 ? "" : cv.slice(Math.max(0, at - span), at + piece.length + span);
 }
 
 // The stretch of CV text around a role's title (and company, when it sits close by): where its dates should be.
@@ -154,7 +165,8 @@ class Checks {
   // Not on the user's record: the skill is left out and the conflict is reported.
   conflicts(name: string): boolean {
     const claim = conflictingClaim(name, this.notOnRecord);
-    if (claim) this.report.conflicts.push({ item: name, claim });
+    const already = this.report.conflicts.some((x) => normalize(x.item) === normalize(name));
+    if (claim && !already) this.report.conflicts.push({ item: name, claim });
     return Boolean(claim);
   }
 }
@@ -193,7 +205,10 @@ function checkExperience(e: RawExperience, c: Checks): Experience | null {
   // and dates are then checked against the text around the job title instead of the whole CV.
   const headerOk = c.inCv(e.header_quote);
   if (e.header_quote.trim() && !headerOk) c.drop(`${label} line "${short(e.header_quote)}"`, NOT_IN_CV);
-  const header = headerOk ? normalize(e.header_quote) : aroundTitle(c.cv, normalize(e.title), normalize(e.company));
+  // Where the role's dates may sit: the text around the quoted line (title and dates are often on separate
+  // lines) plus the text around the title itself. Never the whole CV, so a year elsewhere does not count.
+  const around = aroundTitle(c.cv, normalize(e.title), normalize(e.company));
+  const header = headerOk ? `${windowAround(c.cv, normalize(e.header_quote))} ${around}` : around;
 
   const date = (value: string, which: string): string => {
     if (!value || isPresent(value)) return "";

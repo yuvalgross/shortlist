@@ -54,10 +54,18 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
     );
   }
 
+  // The latest upload's state. When the user already has a confirmed profile, the state is shown above it
+  // instead of hiding it (a failed second upload must not make the confirmed profile disappear).
+  const { count: confirmedRoles } = await supabase
+    .from("experiences")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "confirmed");
+  let status: React.ReactNode = null;
+
   // Reading is capped at 5 minutes on the server. Past that the function was stopped before it could
   // record a failure, so the page treats the upload as failed and offers a retry.
   if (parseLooksStuck(upload)) {
-    return (
+    status = (
       <Card className="flex flex-col gap-3">
         <PageTitle>Reading {upload.file_name} took too long</PageTitle>
         <p role="alert" className="text-red-800">The reading did not finish in time. Try again, or upload a different file.</p>
@@ -67,10 +75,8 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
         </div>
       </Card>
     );
-  }
-
-  if (upload.parse_status === "pending" || upload.parse_status === "parsing") {
-    return (
+  } else if (upload.parse_status === "pending" || upload.parse_status === "parsing") {
+    status = (
       <Card className="flex flex-col gap-3">
         <PageTitle>Reading {upload.file_name}</PageTitle>
         <Poller startedAt={upload.parse_started_at ?? upload.created_at}>
@@ -78,10 +84,8 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
         </Poller>
       </Card>
     );
-  }
-
-  if (upload.parse_status === "failed") {
-    return (
+  } else if (upload.parse_status === "failed") {
+    status = (
       <Card className="flex flex-col gap-3">
         <PageTitle>We could not read {upload.file_name}</PageTitle>
         <p role="alert" className="text-red-800">{upload.error}</p>
@@ -92,6 +96,7 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
       </Card>
     );
   }
+  if (status && !confirmedRoles) return status;
 
   const [{ data: profile }, { data: exps }, { data: stories }, { data: skills }, { data: suggestions }] = await Promise.all([
     supabase.from("profiles").select("full_name, headline, location, languages, education, certifications").maybeSingle(),
@@ -103,7 +108,11 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
   const experiences = (exps ?? []) as Experience[];
   const allStories = (stories ?? []) as Story[];
   const allSkills = (skills ?? []) as Skill[];
-  const pending = (suggestions ?? []) as Suggestion[];
+  // a title suggestion whose role was deleted can no longer be applied, so it is not offered
+  const roleIds = new Set(experiences.map((e) => e.id));
+  const pending = ((suggestions ?? []) as Suggestion[]).filter(
+    (s) => s.kind !== "title" || roleIds.has(String(s.payload.experience_id ?? "")),
+  );
   const report = upload.parse_report ?? {};
 
   const missingDates = experiences.filter((e) => !e.start_date);
@@ -113,6 +122,7 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
       <div className="flex flex-col gap-5">
+        {status}
         <PageTitle sub="Every CV we write later starts from this profile, so wrong dates or titles here end up everywhere. Edit or delete anything that is off.">
           {toReview ? "Here is what we read. Fix anything that is off." : "Your profile"}
         </PageTitle>

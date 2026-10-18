@@ -2,8 +2,10 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { STUCK_AFTER_MS } from "@/lib/cv/status";
 
-const STUCK_AFTER = 5 * 60; // seconds
+// Same limit as the server, so "Try again" only shows once the server will accept it.
+const STUCK_AFTER = STUCK_AFTER_MS / 1000; // seconds
 
 // While the CV is being read, refresh the page every few seconds so the result appears on its own.
 // If it takes far longer than it should, show the retry button passed in as children.

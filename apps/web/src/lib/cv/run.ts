@@ -5,7 +5,8 @@ import { MIN_TEXT_CHARS, extractCvText, kindFor } from "./text";
 import { verifyParse } from "./verify";
 import type { ModelCall } from "./model";
 
-export class UserFacingError extends Error {}
+import { UserFacingError } from "./errors";
+export { UserFacingError };
 
 // Problems with the matching model account rather than with the CV: retrying will not help until they are fixed.
 const PAUSED = "Reading CVs is paused right now because of a problem with the matching model account. Your file is saved; try again later.";

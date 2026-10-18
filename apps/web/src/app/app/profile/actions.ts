@@ -72,9 +72,14 @@ export async function addSkill(formData: FormData) {
   const { supabase, userId } = await requireUser();
   const name = str(formData, "name", 80);
   if (!name) return refresh();
-  // A duplicate (same name, any capitalisation) is refused by the database and simply ignored here.
   const { error } = await supabase.from("skills").insert({ user_id: userId, name, status: "confirmed", source_type: "user" });
-  done(error, UNIQUE_VIOLATION);
+  if (error?.code === UNIQUE_VIOLATION) {
+    // Already there (any capitalisation): typing it in counts as confirming it.
+    const exact = name.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const { error: confirmError } = await supabase.from("skills").update({ status: "confirmed" }).ilike("name", exact);
+    return done(confirmError);
+  }
+  done(error);
 }
 
 export async function removeSkill(formData: FormData) {

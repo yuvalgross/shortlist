@@ -131,3 +131,26 @@ Migration `cv_parsing` applied on Oct 18 2026. Yuval ran the file in the Supabas
 ## Next: Gate 2, scoring rules per user
 
 Target titles with priorities, location points, weights and thresholds per user. Test: roles from past scans replay within 0.5 of the score the scheduled task gave them, and role fit is never raised to reach a threshold.
+
+## Second review after merge (Oct 18 2026, evening)
+
+A reviewer that had not seen any of the day's work read `main` cold and wrote 15 more tests (`apps/web/test/review.test.ts`, `supabase/tests/review.test.mjs`); 7 failed. 14 problems in total, none crossing user boundaries. Fixed in PR #4 and migration `20261018000003_review_fixes.sql`:
+
+| # | Problem | Fix |
+|---|---|---|
+| 1 | High: a CV with the title and the dates on separate lines lost its dates (Yuval's CV keeps them on one line, so his read was fine) | Dates are checked in the text around the quoted line plus around the title |
+| 2 | Two stints with the same title at one company in one CV were collapsed into one | The "newer upload replaces older" rule only touches earlier uploads |
+| 3 | After a second unreviewed upload, confirming left facts from the first one waiting for review forever | Confirm confirms every unreviewed fact the review screen shows |
+| 4 | A CV too long for one reading said "try again in a minute", which would repeat (and pay) forever | Says the CV is too long; skill quotes asked shorter to cut the output |
+| 5 | New bullets under an already confirmed role were dropped silently on a second CV | Saved for review under that role |
+| 6 | A Not on record item could be listed twice | One line per name |
+| 7 | "twenty-five" was read as 20 and 5 | Read as 25 |
+| 8 | "Try again" showed a minute before the server would accept it | Same limit on page and server |
+| 9 | A failed second upload hid the whole confirmed profile | The failure shows above the profile |
+| 10 | A title suggestion for a deleted role stayed as a dead button | Not offered |
+| 11 | Role order mixed between uploads | Follows the role's position in the CV |
+| 12 | Typing a skill that was already suggested did nothing | Confirms it |
+| 13 | The approval check flagged roles without a quote, which is now correct behaviour | Check updated |
+| 14 | Skip sign in works for anyone who can reach the site | Known, on the launch checklist |
+
+Tests after the fixes: database 54 of 54, web 62 of 62, lint, types and build clean.
