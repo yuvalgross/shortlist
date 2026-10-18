@@ -91,7 +91,9 @@ test('crafted suggestion payloads cannot touch another user rows via accept_sugg
   const ids = (await asA(`select id, kind from suggestions order by kind`)).rows;
   for (const s of ids) {
     const a = await asA(`select accept_suggestion($1)`, [s.id]);
-    assert.equal(a.error, undefined, a.error);
+    // a title pointing at a role that is not A's is refused (nothing to change); the story is unlinked instead
+    if (s.kind === 'title') assert.match(a.error ?? '', /no longer exists/);
+    else assert.equal(a.error, undefined, a.error);
   }
   const b = await asB(`select ats_title, (select count(*)::int from stories) as stories from experiences`);
   assert.equal(b.rows[0].ats_title, null, 'B ats_title changed by A');
@@ -154,12 +156,15 @@ test('a bad date fails the whole parse cleanly (no partial writes, upload not ma
   assert.equal(st.rows[0].parse_status, 'parsing');
 });
 
-test('a role without company/title fails cleanly (not null) instead of inserting junk', async () => {
+test('a role without company/title is skipped instead of inserting junk', async () => {
   const up = await newUpload(A, 'cv-null.pdf');
-  const r = await asA(`select apply_cv_parse($1, $2::jsonb)`, [up, JSON.stringify(baseParse({
-    experiences: [{ start_date: '', end_date: '', is_current: false, quote: 'q', results: [] }],
+  const r = await asA(`select apply_cv_parse($1, $2::jsonb) as c`, [up, JSON.stringify(baseParse({
+    experiences: [{ start_date: '', end_date: '', is_current: false, quote: 'q', results: [] }, role('Kept', 'KeptCo')],
   }))]);
-  assert.match(r.error ?? '', /null value/);
+  assert.equal(r.error, undefined, r.error);
+  assert.equal(r.rows[0].c.experiences, 1);
+  const n = await asA(`select count(*)::int as n from experiences where cv_upload_id = $1`, [up]);
+  assert.equal(n.rows[0].n, 1);
 });
 
 test('duplicate skills inside one payload: unique expression index exists and ON CONFLICT works', async () => {

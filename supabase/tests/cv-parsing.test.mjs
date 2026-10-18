@@ -109,7 +109,15 @@ test('user can delete a wrongly read role before confirming; the rest gets confi
 });
 
 test('re-parsing after confirming keeps confirmed facts and does not duplicate confirmed roles', async () => {
-  const r = await asA(`select apply_cv_parse($1, $2::jsonb) as c`, [uploadId, JSON.stringify(parse)]);
+  // a confirmed upload cannot be re-read (that would reopen the review); the same CV as a new upload can
+  const again = await asA(`select apply_cv_parse($1, $2::jsonb) as c`, [uploadId, JSON.stringify(parse)]);
+  assert.match(again.error ?? '', /not found/, 'a confirmed upload is closed for re-reading');
+  const ins = await asA(`insert into cv_uploads (user_id, storage_path, file_name, parse_status, consent_at)
+    values ($1, $2, 'cv-again.pdf', 'parsing', now()) returning id`, [A, `${A}/cv-again.pdf`]);
+  assert.equal(ins.error, undefined, ins.error);
+  const second = ins.rows[0].id;
+  const r = await asA(`select apply_cv_parse($1, $2::jsonb) as c`, [second, JSON.stringify(parse)]);
+  assert.equal(r.error, undefined, r.error);
   assert.equal(r.rows[0].c.experiences, 1, 'only the role the user had deleted comes back, as suggested');
   const n = await asA(`select title, status from experiences order by status, title`);
   assert.deepEqual(n.rows.map((x) => [x.title, x.status]), [['GTM Engineer', 'confirmed'], ['Account Executive', 'suggested']]);
