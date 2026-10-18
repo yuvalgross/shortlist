@@ -70,7 +70,26 @@ He then asked for a deep check of Gates 0 and 1. Two independent reviews, one of
 
 All fixes are in migration `20261018000002_audit_fixes.sql` and the commits of Oct 18. The audit tests stay in the suite (`supabase/tests/audit.test.mjs`, `apps/web/test/audit.test.ts`) so none of this can come back unnoticed.
 
-Still not proven: a real CV read on Vercel end to end. That needs one "Try again" on the preview after the new migration is applied.
+A real CV read on Vercel end to end is now proven (see the live run below).
+
+## Live approval run (Oct 18 2026, 20:35)
+
+Yuval's CV `Yuval_Gross_Cosuno_GTM_Growth_Engineer.pdf` (3,309 characters of text) read on the preview in 40 seconds by `claude-sonnet-5-5`, 3,998 tokens in and 7,738 out. Earlier tries that day failed because the API account had no credit; that is now reported as "Reading CVs is paused" instead of a generic error.
+
+| Check against cv-library.md | Result |
+|---|---|
+| Every saved fact quotes the CV word for word | pass, 50 of 50 |
+| Job bullets saved as results | 12 of 12 |
+| Results with their number | 11 of 12. The twelfth, "GTM foundation ... in three weeks", lost its number because the check only knew digits; number words now count (fixed after this run) |
+| Roles and dates | 6 of 6: CloserStill / OEB Nov 2024 to present, Pragma Aug 2023 to present, CoachHub Nov 2021 to Sep 2024, Luns Jan 2017 to Jan 2020, Boogie Feb 2020 to Nov 2021, DotC 2016 (start only; the CV gives one year) |
+| Locked numbers | 921k, 2.4x, 42%, 1.1M saved with their bullets. 390k and 17 to 5 are not in this CV version, so nothing to find |
+| Profile | name, headline, Berlin, phone, email, LinkedIn and site links, 3 languages, education, certifications: all as written in the CV |
+| Not on your record | no conflicts, but the list was empty at the time, so this check has not been exercised live yet. Manual comparison against the list in cv-library.md: none of the 32 skills is on it |
+| Suggestions | 3: add "CRM scoring" and "paid user acquisition" (both quoted from bullets), shorten the Luns title to "Senior Key Account Manager" (no seniority added) |
+
+Two observations, not failures:
+- The screenshot Yuval sent showed a "Dedupe" suggestion that is no longer in the database: the reading ran twice and the second replaced the first's suggestions. The most likely cause is two clicks on "Try again", which started two paid readings. Starting a reading is now a single claim on the upload, so a second click while one is running does nothing.
+- The education line reads Tel Aviv University, as the CV says. cv-library.md lists this as an open inconsistency with LinkedIn; the parser copies the CV faithfully and does not resolve it.
 
 ## Decisions you may want to change
 

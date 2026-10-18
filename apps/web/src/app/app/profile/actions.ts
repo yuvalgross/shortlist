@@ -18,8 +18,9 @@ function done(error: { message: string; code?: string } | null, ignoreCode?: str
 
 export async function retryParse(formData: FormData) {
   const { supabase } = await requireUser();
-  const started = await scheduleParse(supabase, str(formData, "upload_id"));
-  done(started ? null : { message: "upload cannot be read" });
+  const result = await scheduleParse(supabase, str(formData, "upload_id"));
+  // "already_running" is fine: the page keeps showing the reading in progress
+  done(result === "refused" ? { message: "upload cannot be read" } : null);
 }
 
 export async function updateBasics(formData: FormData) {

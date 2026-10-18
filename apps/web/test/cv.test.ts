@@ -122,3 +122,14 @@ describe("checking what the model read (fictional CV with planted mistakes)", ()
     expect(out.report.counts).toEqual({ experiences: 3, results: 7, skills: 7, suggestions: 2 });
   });
 });
+
+describe("numbers written as words", () => {
+  it("count as numbers on both sides of the metric check", () => {
+    expect(numbersIn("a GTM foundation in three weeks")).toEqual(["3"]);
+    expect(numbersIn("Pilot on one product for six weeks")).toEqual(["1", "6"]);
+    expect(numbersIn("Eighteen months")).toEqual(["18"]);
+  });
+  it("do not match inside other words", () => {
+    expect(numbersIn("someone often tension")).toEqual([]);
+  });
+});

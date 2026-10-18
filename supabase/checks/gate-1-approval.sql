@@ -10,7 +10,8 @@ with me as (
   -- every bullet in the CV text (cv_engine CVs use "•")
   -- first line after each "•"; header separators like "Title • City" are short, so length filters them out
   select trim(split_part(b, E'\n', 1)) as bullet
-  from up, regexp_split_to_table(up.parsed_text, '•') with ordinality as t(b, i)
+  -- only the work history: skills lines also start with "•" but are not results
+  from up, regexp_split_to_table(coalesce(substring(up.parsed_text from 'WORK EXPERIENCE.*'), up.parsed_text), '•') with ordinality as t(b, i)
   where i > 1 and length(trim(split_part(b, E'\n', 1))) > 40
 ), stories_of as (
   select s.* from stories s join me on s.user_id = me.id where s.cv_upload_id = (select id from up)
@@ -72,7 +73,6 @@ select 9, 'what the checks removed (review by hand)', true,
                || coalesce(jsonb_array_length(parse_report->'metrics_removed'), 0) || ' numbers removed, '
                || coalesce(jsonb_array_length(parse_report->'conflicts'), 0) || ' conflicts' from up)
 union all
-select 10, 'cost of this parse (Sonnet 5.5: $2 in, $10 out per million tokens)', true,
-       (select '$' || round(((parse_report->'usage'->>'input_tokens')::numeric * 2 + (parse_report->'usage'->>'output_tokens')::numeric * 10) / 1e6, 4)
-               || ' (' || (parse_report->'usage'->>'input_tokens') || ' in, ' || (parse_report->'usage'->>'output_tokens') || ' out)' from up)
+select 10, 'tokens used by this parse (multiply by the current model price for cost)', true,
+       (select (parse_report->'usage'->>'input_tokens') || ' in, ' || (parse_report->'usage'->>'output_tokens') || ' out' from up)
 order by n;
