@@ -19,7 +19,7 @@ export default function AppLayout({ children }: LayoutProps<"/app">) {
           <button type="submit" className="rounded-lg border border-line px-4 py-2 text-sm">Sign out</button>
         </form>
       </header>
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-10">{children}</main>
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-10">{children}</main>
     </div>
   );
 }

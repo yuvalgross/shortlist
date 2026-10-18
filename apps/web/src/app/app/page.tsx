@@ -5,9 +5,11 @@ import { Card, PageTitle, Tag } from "@/components/ui";
 
 export default function AppHome() {
   return (
-    <Suspense fallback={<p className="text-muted">Loading…</p>}>
-      <Home />
-    </Suspense>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <Suspense fallback={<p className="text-muted">Loading…</p>}>
+        <Home />
+      </Suspense>
+    </div>
   );
 }
 
