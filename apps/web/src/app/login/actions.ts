@@ -32,10 +32,6 @@ export async function sendMagicLink(formData: FormData) {
 // TEMPORARY (Yuval's testing shortcut). Delete this function, the button on the login page and the two
 // QUICK_SIGNIN_* variables in Vercel before the site is opened to anyone else. The password lives only in
 // Vercel's server settings; the button never sees it.
-export function quickSignInEnabled() {
-  return Boolean(process.env.QUICK_SIGNIN_EMAIL && process.env.QUICK_SIGNIN_PASSWORD);
-}
-
 export async function quickSignIn(formData: FormData) {
   const email = process.env.QUICK_SIGNIN_EMAIL;
   const password = process.env.QUICK_SIGNIN_PASSWORD;

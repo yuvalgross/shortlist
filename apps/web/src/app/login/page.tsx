@@ -1,5 +1,8 @@
 import { Suspense } from "react";
-import { quickSignIn, quickSignInEnabled, sendMagicLink } from "./actions";
+import { quickSignIn, sendMagicLink } from "./actions";
+
+// TEMPORARY: the Skip sign in button shows only while both server settings exist (see quickSignIn).
+const quickSignInEnabled = () => Boolean(process.env.QUICK_SIGNIN_EMAIL && process.env.QUICK_SIGNIN_PASSWORD);
 
 const messages: Record<string, string> = {
   email: "Enter a valid email address.",
