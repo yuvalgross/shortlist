@@ -32,7 +32,7 @@ docs/reference/      What the scheduled task does today: the spec each gate is m
 ## Run the checks
 
 ```
-cd supabase/tests && npm ci && npm test     # database and isolation
+cd supabase/tests && npm ci && npm test     # database: isolation, CV parsing, audit
 cd apps/web && npm ci && npm test && npm run build   # web app (needs the env vars from .env.example)
 cd worker && pip install -e ".[dev]" && pytest -q
 ```

@@ -23,8 +23,8 @@ Status: waiting for approval. Two things only you can do are listed at the botto
 
 | Suite | Result |
 |---|---|
-| Database (embedded Postgres 17, all 5 migrations) | 23 of 23 pass: Gate 0's 11, the 11 new CV tests, and the approval query smoke test |
-| Web unit tests (vitest) | 20 of 20 pass |
+| Database (embedded Postgres 17, all 6 migrations) | 46 of 46 pass: Gate 0's 11, the 11 CV tests, the approval query smoke test, and 23 audit tests |
+| Web unit tests (vitest) | 50 of 50 pass, including 24 audit tests and a test that sends the real request through the Anthropic library |
 | Lint, type check, production build | clean |
 
 The new database tests cover:
@@ -40,6 +40,38 @@ The web tests use a fictional CV (Mara Lindqvist, PDF and Word) with a model ans
 
 **Control check:** I switched off the quote check and the number check and reran. 3 tests failed, so the tests catch the mistakes rather than passing by default.
 
+## First live run, and the deep check that followed (Oct 18 2026)
+
+Yuval's first upload on the preview failed before the request reached the model: I had set the model's answer limit so high that the Anthropic library refused to send it. My tests had not caught it because they used a stand-in for the model. Fixed, with a test that now sends the real request to a fake server.
+
+He then asked for a deep check of Gates 0 and 1. Two independent reviews, one of the database and one of the web code, wrote 47 adversarial tests. 15 failed, meaning 15 real problems. **None of them let one user reach another user's data**: every one of the 22 tables has row level security on and forced, nothing is granted to signed out visitors, storage is folder per user, and the live database matches the migration files exactly (same fingerprint for columns, functions, indexes, policies and enums). The problems were about the app working correctly for its own user.
+
+| # | Problem a user would have hit | Fix |
+|---|---|---|
+| 1 | An upload could sit on "Reading…" forever: a model retry could outlast Vercel's 5 minute limit, so the function was killed before it could record a failure | No automatic retry; one attempt of at most 4 minutes |
+| 2 | Same outcome if the sign in token expired during a long read: the save at the end fails, and so does the attempt to record the failure | Token refreshed before the read when under 10 minutes remain; a failure to record is logged |
+| 3 | After a stuck read, no way to retry unless the tab stayed open 5 minutes | The profile page treats a read older than 6 minutes as failed and shows "Try again" |
+| 4 | "Save role" wiped the role's location every time (the form has no location box) | Only fields the form sent are updated |
+| 5 | A role's "From your CV" line was saved without checking it was in the CV; an invented year passed if it appeared anywhere in the CV | Unverified lines are dropped and listed; dates are checked in the text around the job title |
+| 6 | "Present" with a capital P produced a false "not a valid date" note | Case no longer matters |
+| 7 | Items over the limits (15 results per role, 80 skills, 8 suggestions) vanished without a note | Listed under "What we left out" |
+| 8 | Retry on an already confirmed upload reopened the review | Refused in the app and in the database |
+| 9 | A story could point at a role that is not the user's; a failed save still said "Saved." | Role ownership checked; save errors show a message |
+| 10 | Save buttons on the profile and proof pages hid database errors | Every save reports "Saving failed. Try again." |
+| 11 | The login redirect leaked the page's query into the login URL and lost it on return | Fixed |
+| 12 | Deleting an upload left its unreviewed facts floating with no way to confirm or remove them | Deleting an upload removes its unreviewed facts |
+| 13 | The same role from two uploads appeared twice in review | The newer upload's version replaces the older unreviewed one; confirmed roles still never duplicate |
+| 14 | A decided suggestion could be flipped back to pending and applied again, which duplicated stories | The update policy only reaches pending suggestions |
+| 15 | The scoring rules function accepted nonsense: negative weights, a daily limit of 0, a queue threshold of 50 | Lower bounds and allowed values, also as table constraints |
+| 16 | The profile snapshot was rebuilt once per saved row: 91 times for one CV read | Unreviewed rows no longer trigger a rebuild; at most 2 per read |
+| 17 | Twelve user id and foreign key columns had no index (row level security filters on user id) | Indexes added |
+| 18 | Accepting a title suggestion for a deleted role reported success and changed nothing; a negative role index pointed at the last role | Error instead; negative index skipped |
+| 19 | Profile list fields could be set to JSON null and then never filled | Treated as empty; array constraint on the columns |
+
+All fixes are in migration `20261018000002_audit_fixes.sql` and the commits of Oct 18. The audit tests stay in the suite (`supabase/tests/audit.test.mjs`, `apps/web/test/audit.test.ts`) so none of this can come back unnoticed.
+
+Still not proven: a real CV read on Vercel end to end. That needs one "Try again" on the preview after the new migration is applied.
+
 ## Decisions you may want to change
 
 1. **The API key now lives in Vercel, not the worker.** This changes what I told you in Gate 0. The CV is read inside the web app's server function, so the key has to be there. It is a server only, Sensitive variable, never sent to the browser. Moving it to the worker would mean the worker polling for uploads, which adds a moving part for no gain at this stage.
@@ -50,7 +82,7 @@ The web tests use a fictional CV (Mara Lindqvist, PDF and Word) with a model ans
 
 ## Live database
 
-Applied on Oct 18 2026. Yuval ran the migration file in the Supabase SQL editor, because the connector's approval prompt kept cancelling.
+Migration `cv_parsing` applied on Oct 18 2026. Yuval ran the file in the Supabase SQL editor, because the connector's approval prompt kept cancelling. Migration `audit_fixes` is waiting to be applied the same way (see below).
 
 | Check on the live database | Result |
 |---|---|
@@ -62,14 +94,14 @@ Applied on Oct 18 2026. Yuval ran the migration file in the Supabase SQL editor,
 
 ## What you need to do
 
-1. ~~Database change~~ done.
+1. ~~Database change `cv_parsing`~~ done. **Database change `audit_fixes`: still to run** (copy `supabase/migrations/20261018000002_audit_fixes.sql` into the SQL editor and press Run).
 2. ~~API key in Vercel~~ done, preview redeployed with it. Steps kept for reference:
    - Project shortlist > Settings > Environment Variables > Add.
    - Name `ANTHROPIC_API_KEY`, value from console.anthropic.com > API Keys.
    - Tick Sensitive, then Production and Preview. Save.
    - Redeploy the preview: Deployments > latest gate-1 > ⋯ > Redeploy.
 3. On the preview, open **Proof** and paste your Not on your record list.
-4. **Upload your CV** (the latest cv_engine PDF), wait for it to finish, and tell me.
+4. On **Profile**, press **Try again** on the upload that failed (or upload your full master CV), wait for it to finish, and tell me.
    - I run the approval query and add the results here.
    - Expected: OEB/CloserStill Nov 2024 to present, Pragma Aug 2023 to present, CoachHub Nov 2021 to Sep 2024, Luns Jan 2017 to Jan 2020, plus earlier roles if listed.
    - Every metric in the CV saved with its number: €921k, 2.4x, 42%, €295k to €390k, 17 to 5 tools, €1.1M.
