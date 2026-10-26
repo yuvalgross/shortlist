@@ -38,3 +38,7 @@ cd worker && pip install -e ".[dev]" && pytest -q
 ```
 
 The same checks run on every pull request (`.github/workflows/ci.yml`).
+
+## Database changes
+
+New files in `supabase/migrations/` are applied to the live Supabase project automatically when they reach `main` (`.github/workflows/migrate.yml`). Merging the pull request is the approval; the same migrations have already passed the database tests in CI. The workflow needs two repository secrets, `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`; without them it skips with a warning.
