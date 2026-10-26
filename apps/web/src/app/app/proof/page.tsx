@@ -13,12 +13,12 @@ type Exp = { id: string; title: string; company: string };
 
 export default function ProofPage({ searchParams }: PageProps<"/app/proof">) {
   return (
-    <>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <Steps current={2} />
       <Suspense fallback={<p className="text-muted">Loading your proof bank…</p>}>
         <Proof searchParams={searchParams} />
       </Suspense>
-    </>
+    </div>
   );
 }
 

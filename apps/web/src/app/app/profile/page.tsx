@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/user";
 import { parseLooksStuck } from "@/lib/cv/status";
+import { kindFor } from "@/lib/cv/text";
 import { Card, PageTitle, Steps, SuggestionCard, Tag, btn, field, label } from "@/components/ui";
 import type { ParseReport } from "@/lib/cv/verify";
 import { Poller } from "./poller";
@@ -13,7 +14,7 @@ import {
 export const maxDuration = 300; // "Try again" restarts the background reading from this page
 
 type Upload = {
-  id: string; file_name: string; parse_status: string; error: string | null; created_at: string;
+  id: string; file_name: string; mime_type: string | null; parsed_text: string | null; parse_status: string; error: string | null; created_at: string;
   parse_started_at: string | null; parsed_at: string | null; parse_report: Partial<ParseReport> | null;
 };
 type Experience = {
@@ -40,7 +41,7 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
   const params = await searchParams;
   const { data: upload } = await supabase
     .from("cv_uploads")
-    .select("id, file_name, parse_status, error, created_at, parse_started_at, parsed_at, parse_report")
+    .select("id, file_name, mime_type, parsed_text, parse_status, error, created_at, parse_started_at, parsed_at, parse_report")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle<Upload>();
@@ -120,13 +121,15 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
   const toReview = upload.parse_status === "parsed";
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-      <div className="flex flex-col gap-5">
+    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.85fr)]">
+      <div className="flex min-w-0 flex-col gap-5">
         {status}
-        <PageTitle sub="Every CV we write later starts from this profile, so wrong dates or titles here end up everywhere. Edit or delete anything that is off.">
+        <PageTitle sub="Every CV we write later starts from this profile, so wrong dates or titles here end up everywhere. Compare it with your CV on the right, then edit or delete anything that is off.">
           {toReview ? "Here is what we read. Fix anything that is off." : "Your profile"}
         </PageTitle>
         {(params.error === "confirm" || params.error === "save") && <p role="alert" className="text-red-800">Saving failed. Try again.</p>}
+
+        <Notes pending={pending} missingDates={missingDates} noNumber={noNumber} report={report} />
 
         <Card>
           <form action={updateBasics} className="grid gap-3 sm:grid-cols-3">
@@ -177,42 +180,84 @@ async function Profile({ searchParams }: { searchParams: PageProps<"/app/profile
         )}
       </div>
 
-      <aside className="flex flex-col gap-4">
-        {pending.length > 0 && (
-          <SuggestionCard>
-            <h2 className="font-semibold text-[#0a3f35]">{pending.length} suggestion{pending.length > 1 ? "s" : ""} from your CV</h2>
-            <p className="mt-1 text-sm text-[#2f4f47]">Things your CV says that the profile does not use yet. Each shows the line it came from.</p>
-            <ul className="mt-3 flex flex-col gap-3">
-              {pending.map((s) => (
-                <li key={s.id} className="rounded-lg border border-[#d3e7df] bg-surface p-3">
-                  <p className="text-sm">
-                    {s.kind === "skill" ? <>Add <strong>{s.payload.name}</strong> to your skills</> : <>Use the standard title <strong>{s.payload.ats_title}</strong> for &ldquo;{s.payload.original_title}&rdquo;</>}
-                  </p>
-                  {s.source_quote && <p className="mt-1 font-mono text-xs text-muted">&ldquo;{s.source_quote}&rdquo;</p>}
-                  <div className="mt-2 flex gap-2">
-                    <form action={acceptSuggestion}><input type="hidden" name="id" value={s.id} /><button className={btn.smallPrimary}>{s.kind === "title" ? "Apply" : "Add"}</button></form>
-                    <form action={rejectSuggestion}><input type="hidden" name="id" value={s.id} /><button className={btn.small}>Not accurate</button></form>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </SuggestionCard>
-        )}
-
-        {(missingDates.length > 0 || noNumber.length > 0 || (report.conflicts?.length ?? 0) > 0) && (
-          <section className="rounded-xl border border-[#ebd3b4] bg-[#fbf3e8] p-5 text-sm leading-relaxed text-[#5c2d04]">
-            <h2 className="mb-1 font-semibold">Worth fixing</h2>
-            <ul className="list-disc pl-4">
-              {missingDates.length > 0 && <li>{missingDates.length} role{missingDates.length > 1 ? "s have" : " has"} no start date. ATS filters often skip CVs with dates they cannot read.</li>}
-              {noNumber.length > 0 && <li>{noNumber.length} result{noNumber.length > 1 ? "s have" : " has"} no number. <Link href="/app/proof" className="underline">Add them in the proof bank</Link>.</li>}
-              {report.conflicts?.map((c) => <li key={c.item}>Your CV lists <strong>{c.item}</strong>, but you marked &ldquo;{c.claim}&rdquo; as not on your record, so we left it out.</li>)}
-            </ul>
-          </section>
-        )}
-
+      <aside className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-6 xl:self-start">
+        <CvPreview upload={upload} />
         <ReportBox report={report} />
       </aside>
     </div>
+  );
+}
+
+// Suggestions and things worth fixing, shown above the profile so they are acted on first.
+function Notes({ pending, missingDates, noNumber, report }: { pending: Suggestion[]; missingDates: unknown[]; noNumber: unknown[]; report: Partial<ParseReport> }) {
+  return (
+    <>
+          {pending.length > 0 && (
+            <SuggestionCard>
+              <h2 className="font-semibold text-[#0a3f35]">{pending.length} suggestion{pending.length > 1 ? "s" : ""} from your CV</h2>
+              <p className="mt-1 text-sm text-[#2f4f47]">Things your CV says that the profile does not use yet. Each shows the line it came from.</p>
+              <ul className="mt-3 flex flex-col gap-3">
+                {pending.map((s) => (
+                  <li key={s.id} className="rounded-lg border border-[#d3e7df] bg-surface p-3">
+                    <p className="text-sm">
+                      {s.kind === "skill" ? <>Add <strong>{s.payload.name}</strong> to your skills</> : <>Use the standard title <strong>{s.payload.ats_title}</strong> for &ldquo;{s.payload.original_title}&rdquo;</>}
+                    </p>
+                    {s.source_quote && <p className="mt-1 font-mono text-xs text-muted">&ldquo;{s.source_quote}&rdquo;</p>}
+                    <div className="mt-2 flex gap-2">
+                      <form action={acceptSuggestion}><input type="hidden" name="id" value={s.id} /><button className={btn.smallPrimary}>{s.kind === "title" ? "Apply" : "Add"}</button></form>
+                      <form action={rejectSuggestion}><input type="hidden" name="id" value={s.id} /><button className={btn.small}>Not accurate</button></form>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </SuggestionCard>
+          )}
+
+          {(missingDates.length > 0 || noNumber.length > 0 || (report.conflicts?.length ?? 0) > 0) && (
+            <section className="rounded-xl border border-[#ebd3b4] bg-[#fbf3e8] p-5 text-sm leading-relaxed text-[#5c2d04]">
+              <h2 className="mb-1 font-semibold">Worth fixing</h2>
+              <ul className="list-disc pl-4">
+                {missingDates.length > 0 && <li>{missingDates.length} role{missingDates.length > 1 ? "s have" : " has"} no start date. ATS filters often skip CVs with dates they cannot read.</li>}
+                {noNumber.length > 0 && <li>{noNumber.length} result{noNumber.length > 1 ? "s have" : " has"} no number. <Link href="/app/proof" className="underline">Add them in the proof bank</Link>.</li>}
+                {report.conflicts?.map((c) => <li key={c.item}>Your CV lists <strong>{c.item}</strong>, but you marked &ldquo;{c.claim}&rdquo; as not on your record, so we left it out.</li>)}
+              </ul>
+            </section>
+          )}
+
+          <ReportBox report={report} />
+    </>
+  );
+}
+
+// The uploaded file, next to what was read from it. PDFs show in the page; Word files cannot be shown by a
+// browser, so the text we read is shown instead with a download link.
+function CvPreview({ upload }: { upload: Upload }) {
+  const kind = kindFor(upload.mime_type ?? "", upload.file_name);
+  const href = `/app/cv/${upload.id}`;
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-semibold">Your CV</h2>
+        <a href={href} target="_blank" rel="noopener" className="text-sm underline">
+          {kind === "pdf" ? "Open in a new tab" : "Download"}
+        </a>
+      </div>
+      <p className="truncate text-sm text-muted" title={upload.file_name}>{upload.file_name}</p>
+      {kind === "pdf" ? (
+        <iframe
+          src={`${href}#view=FitH`}
+          title={`Your uploaded CV, ${upload.file_name}`}
+          className="h-[70vh] min-h-[480px] w-full rounded-lg border border-line bg-white"
+        />
+      ) : (
+        <>
+          <p className="text-sm text-muted">Browsers cannot show Word files, so this is the text we read from it.</p>
+          <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-white p-4 text-xs leading-relaxed">
+            {upload.parsed_text ?? "No text yet."}
+          </pre>
+        </>
+      )}
+    </Card>
   );
 }
 
