@@ -145,7 +145,7 @@ test('set_scoring_config merges partial factor rules and validates them', async 
   assert.equal(r.rows[0].factor_rules.deduction_cap, -1);
 
   for (const [cfg, msg] of [
-    ['{"factor_rules": {"cv_threshold_by_factor": {"run_and_report": 7.5}}}', /between cv_threshold and 10/],
+    ['{"factor_rules": {"cv_threshold_by_factor": {"run_and_report": 10.5}}}', /between 5 and 10/],
     ['{"factor_rules": {"deductions": {"sales_ops": 0.5}}}', /between -1 and 0/],
     ['{"factor_rules": {"deductions": {"vibes": -0.5}}}', /unknown deduction/],
     ['{"factor_rules": {"bonus": {}}}', /unknown part/],
@@ -160,4 +160,51 @@ test('set_scoring_config merges partial factor rules and validates them', async 
 test('the profile snapshot carries the active factor rules', async () => {
   const r = await asA(`select snapshot from profile_snapshots`);
   assert.equal(r.rows[0].snapshot.scoring.factor_rules.team_size.build_small_max, 100);
+});
+
+test('a cv_threshold above the default 8.5 run and report bar can be saved, and the higher bar wins', async () => {
+  let r = await asA(`select set_scoring_config('{"cv_threshold": 9}'::jsonb) as id`);
+  assert.equal(r.error, undefined, r.error);
+  const cfg = r.rows[0].id;
+  const jobId = await job(big, 'cv9');
+  r = await asWorker(
+    `insert into job_matches (user_id, job_id, config_id, role_fit, factors)
+     values ($1, $2, $3, 8, '{"run_and_report": true}'::jsonb) returning cv_threshold_applied::float8 as bar`,
+    [A, jobId, cfg]);
+  assert.equal(r.error, undefined, r.error);
+  assert.equal(r.rows[0].bar, 9);
+});
+
+test('the widest factor rules the config allows still fit adjust_points', async () => {
+  const rules = {
+    pay_band: { below: -3, above: 2 },
+    team_size: { build_small: 1, ops_large: -1 },
+    deductions: { sales_ops: -1, run_and_report: -1, ops_years_gap: -1 },
+    deduction_cap: -3,
+  };
+  let r = await asA(`select set_scoring_config($1::jsonb) as id`, [JSON.stringify({ factor_rules: rules })]);
+  assert.equal(r.error, undefined, r.error);
+  const cfg = r.rows[0].id;
+  const tiny = await company('Tiny', 40);
+  const huge = await company('Huge', 5000);
+  const insert = async (ext, companyId, factors) => {
+    const jobId = await job(companyId, ext);
+    return asWorker(
+      `insert into job_matches (user_id, job_id, config_id, role_fit, factors)
+       values ($1, $2, $3, 5, $4::jsonb) returning adjust_points::float8 as adjust`,
+      [A, jobId, cfg, JSON.stringify(factors)]);
+  };
+  r = await insert('wide-top', tiny, { pay_band: 'above', pay_band_source: 'posting', team_size: 'build_small' });
+  assert.equal(r.error, undefined, r.error);
+  assert.equal(r.rows[0].adjust, 3);
+  r = await insert('wide-bottom', huge, { pay_band: 'below', pay_band_source: 'posting', team_size: 'ops_large',
+    sales_ops: true, run_and_report: true, ops_years_gap: true });
+  assert.equal(r.error, undefined, r.error);
+  assert.equal(r.rows[0].adjust, -6);
+});
+
+test('the shortlist index on total_fit exists', async () => {
+  const r = await asWorker(`select indexdef from pg_indexes where tablename = 'job_matches' and indexdef like '%total_fit%'`);
+  assert.equal(r.rows.length, 1);
+  assert.match(r.rows[0].indexdef, /\(user_id, status, total_fit DESC\)/);
 });

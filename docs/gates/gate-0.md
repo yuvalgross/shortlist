@@ -15,7 +15,7 @@ Status: waiting for approval. Approve by merging the Gate 0 pull request.
 
 | Your scan today | Platform equivalent |
 |---|---|
-| Role fit plus location points, capped at 10, role fit never raised to reach a threshold | `job_matches.role_fit` and `location_points` are stored separately; `total_fit` is computed by the database as `least(10, role_fit + location_points)`, so it can't be edited or inflated |
+| Role fit plus location points, capped at 10, role fit never raised to reach a threshold | `job_matches.role_fit` and `location_points` are stored separately; `total_fit` is computed by the database as `least(10, greatest(0, role_fit + location_points + adjust_points))`, where `adjust_points` comes from the Gate 2 fit factors (pay band, team size, deductions), so it can't be edited or inflated |
 | CV only at total fit 8 or above, max 3 per run | `scoring_configs.cv_threshold` (default 8.0) and `cv_cap_per_run` (default 3, hard max 5) |
 | Only the company's current job list is proof a role is open | `companies.list_url` holds the list URL; `jobs.last_verified_at` and `jobs.status` record the last time the role was seen there |
 | Board: never overwrite an application Yuval edited (`updated` field) | `applications.user_edited_at`; the worker will skip rows where it is set |
