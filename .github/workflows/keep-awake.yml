@@ -1,32 +1,39 @@
 name: keep database awake
 
 # Supabase pauses free projects after about a week without use, which takes the site down for testers.
-# One small read a day counts as use. Row level security returns nothing to an anonymous visitor,
-# so no data leaves the database. A failed run emails the repo owner, which is the early warning.
+# One small database read a day counts as use. It reads only the migration history (no user data),
+# with the same secrets the database workflow uses. A failed run emails the repo owner: the early warning.
 on:
   schedule:
     - cron: "17 6 * * *" # every day 06:17 UTC
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
-      # Public values: the same URL and publishable key are shipped to every browser that opens the site.
-      SUPABASE_URL: https://drepfivmsbwysryvpjlm.supabase.co
-      SUPABASE_PUBLISHABLE_KEY: sb_publishable_L54B3JlWTIxGpHcuVtT7_g_u-5fwi-Q
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: drepfivmsbwysryvpjlm
     steps:
-      - name: Read one row through the database API
+      - uses: actions/checkout@v5
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+
+      - name: Read the migration history from the live database
         run: |
-          code=$(curl -sS -o /tmp/body -w '%{http_code}' --retry 3 --retry-delay 20 --retry-all-errors \
-            "$SUPABASE_URL/rest/v1/profiles?select=user_id&limit=1" \
-            -H "apikey: $SUPABASE_PUBLISHABLE_KEY")
-          echo "HTTP $code"
-          if [ "$code" != "200" ]; then
-            echo "::error::Database did not answer (HTTP $code). It may be paused: open supabase.com, the shortlist project, and click Restore project."
-            cat /tmp/body
-            exit 1
-          fi
+          for attempt in 1 2 3; do
+            if supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" \
+               && supabase migration list --password "$SUPABASE_DB_PASSWORD"; then
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::The database did not answer. It may be paused: open supabase.com, the shortlist project, and click Restore project."
+          exit 1
