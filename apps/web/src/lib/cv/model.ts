@@ -24,18 +24,25 @@ export function claudeModelCall(
 ): ModelCall {
   const client = new Anthropic({ apiKey, timeout: PARSE_TIMEOUT_MS, maxRetries: 0, ...(fetchImpl ? { fetch: fetchImpl } : {}) });
   return async (cvText) => {
-    const res = await client.messages.parse({
-      model,
-      max_tokens: PARSE_MAX_TOKENS,
-      system: CV_PARSE_SYSTEM,
-      messages: [{ role: "user", content: cvParseUserMessage(cvText) }],
-      output_config: { format: jsonSchemaOutputFormat(cvParseSchema, { transform: false }) },
-    });
+    const tooLong = new UserFacingError(
+      "This CV is too long to read in one go. Upload a shorter version (two pages at most) and try again.",
+    );
+    // A reply cut off at the token limit is usually broken JSON, which the SDK rejects before we see the stop reason.
+    const res = await client.messages
+      .parse({
+        model,
+        max_tokens: PARSE_MAX_TOKENS,
+        system: CV_PARSE_SYSTEM,
+        messages: [{ role: "user", content: cvParseUserMessage(cvText) }],
+        output_config: { format: jsonSchemaOutputFormat(cvParseSchema, { transform: false }) },
+      })
+      .catch((err: unknown) => {
+        if (/parse structured output/i.test(String((err as Error)?.message))) throw tooLong;
+        throw err;
+      });
     if (res.stop_reason === "max_tokens") {
       // Retrying gives the same result, so say what to change instead of "try again".
-      throw new UserFacingError(
-        "This CV is too long to read in one go. Upload a shorter version (two pages at most) and try again.",
-      );
+      throw tooLong;
     }
     if (!res.parsed_output) {
       throw new Error(`The matching model returned no result (stop reason: ${res.stop_reason ?? "unknown"}).`);

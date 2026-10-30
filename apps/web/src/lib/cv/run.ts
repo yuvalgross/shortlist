@@ -10,11 +10,11 @@ export { UserFacingError };
 
 // Problems with the matching model account rather than with the CV: retrying will not help until they are fixed.
 const PAUSED = "Reading CVs is paused right now because of a problem with the matching model account. Your file is saved; try again later.";
-export function accountProblem(err: unknown): string | null {
+export function accountProblem(err: unknown, paused = PAUSED): string | null {
   const e = err as { status?: number; message?: string } | null;
   const text = String(e?.message ?? "").toLowerCase();
-  if (e?.status === 401 || e?.status === 403) return PAUSED;
-  if (e?.status === 400 && /credit balance|billing/.test(text)) return PAUSED;
+  if (e?.status === 401 || e?.status === 403) return paused;
+  if (e?.status === 400 && /credit balance|billing/.test(text)) return paused;
   return null;
 }
 

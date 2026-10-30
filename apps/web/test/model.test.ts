@@ -41,4 +41,12 @@ describe("the call to the matching model", () => {
     await expect(call).rejects.toBeInstanceOf(UserFacingError);
     await expect(claudeModelCall("sk-test", "claude-sonnet-5-5", fakeApi("max_tokens").fetchImpl)("CV text")).rejects.toThrow(/too long/);
   });
+
+  it("broken JSON from a cut off reply also says the CV is too long", async () => {
+    const fetchImpl = (async () => new Response(JSON.stringify({
+      id: "msg", type: "message", role: "assistant", model: "m", content: [{ type: "text", text: '{"full_name": "An' }],
+      stop_reason: "max_tokens", stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 },
+    }), { status: 200, headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
+    await expect(claudeModelCall("sk", "m", fetchImpl)("CV")).rejects.toThrow(/too long/);
+  });
 });

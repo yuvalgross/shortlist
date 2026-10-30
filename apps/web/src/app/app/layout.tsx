@@ -13,6 +13,9 @@ export default function AppLayout({ children }: LayoutProps<"/app">) {
             <Link href="/app/upload" className="rounded-md px-3 py-2 text-muted hover:text-foreground">Upload CV</Link>
             <Link href="/app/profile" className="rounded-md px-3 py-2 text-muted hover:text-foreground">Profile</Link>
             <Link href="/app/proof" className="rounded-md px-3 py-2 text-muted hover:text-foreground">Proof bank</Link>
+            <Link href="/app/jobs" className="rounded-md px-3 py-2 text-muted hover:text-foreground">Score a job</Link>
+            <Link href="/app/targets" className="rounded-md px-3 py-2 text-muted hover:text-foreground">Targets</Link>
+            <Link href="/app/rules" className="rounded-md px-3 py-2 text-muted hover:text-foreground">Rules</Link>
           </nav>
         </div>
         <form action={signOut}>
