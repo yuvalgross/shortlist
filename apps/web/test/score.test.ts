@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   checkScore, fitLine, locationRules, payBand, quoteIn, roundHalf, teamSize, anchorsFrom, DEFAULT_ANCHORS,
+  numbersIn, parseAmount, savedSalary, yearsIn,
 } from "@/lib/score/rules";
 import type { RawScore } from "@/lib/score/schema";
 import { scoreJob } from "@/lib/score/run";
@@ -157,7 +158,7 @@ describe("checking the model's answer", () => {
   });
 
   it("the headcount the user typed beats the ad", () => {
-    const c = checkScore(raw({ headcount: { stated: true, value: 65, quote: "we are 65 people" }, role_shape: { value: "ops_titled", quote: "" } }),
+    const c = checkScore(raw({ headcount: { stated: true, value: 65, quote: "we are 65 people" }, role_shape: { value: "ops_titled", quote: "Take over and further develop our existing reporting" } }),
       { jobText: JD, headcount: 1100 }, RULES, FLOOR);
     expect(c.headcount).toBe(1100);
     expect(c.factors.team_size).toBe("ops_large");
@@ -313,5 +314,74 @@ describe("the call to the matching model", () => {
       stop_reason: "max_tokens", stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 },
     }), { status: 200, headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
     await expect(claudeScoreCall("sk", "m", fetchImpl)("x")).rejects.toBeInstanceOf(UserFacingError);
+  });
+});
+
+describe("fixes from the 10-30 review", () => {
+  it("typed amounts: German separators, k and ranges", () => {
+    expect(parseAmount("70.000")).toBe(70000);
+    expect(parseAmount("70,000")).toBe(70000);
+    expect(parseAmount("70 000")).toBe(70000);
+    expect(parseAmount("70k")).toBe(70000);
+    expect(parseAmount("1.200")).toBe(1200);
+    expect(parseAmount("50-100")).toBe(50);
+    expect(parseAmount("")).toBe(0);
+    expect(parseAmount("about")).toBe(0);
+  });
+
+  it("numbers in a quote are read with separators and k", () => {
+    expect(numbersIn("EUR 60,000 to 75.000 and 90k")).toEqual([60000, 75000, 90000]);
+    expect(numbersIn("we are 65 people")).toEqual([65]);
+    expect(numbersIn("25,50 EUR per hour")).toEqual([25.5]);
+  });
+
+  it("pay amounts that are not in their quote are dropped", () => {
+    const c = checkScore(raw({ salary: { stated: true, min: 90000, max: 100000, currency: "EUR", period: "year", is_ote: false, quote: "Salary: EUR 50,000 to 90,000 per year." } }), { jobText: JD }, RULES, FLOOR);
+    expect(c.factors.pay_band).toBe("not_stated");
+    expect(c.details.dropped[0]).toMatch(/amounts are not the ones/);
+  });
+
+  it("a headcount that is not in its quote is dropped", () => {
+    const c = checkScore(raw({ headcount: { stated: true, value: 650, quote: "we are 65 people" } }), { jobText: JD }, RULES, FLOOR);
+    expect(c.headcount).toBeNull();
+    expect(c.factors.team_size).toBe("unknown");
+  });
+
+  it("a role shape without a real quote gives no team size points", () => {
+    const c = checkScore(raw({ role_shape: { value: "build", quote: "" } }), { jobText: JD, headcount: 40 }, RULES, FLOOR);
+    expect(c.factors.team_size).toBe("neutral");
+    expect(c.details.dropped.join(" ")).toMatch(/role shape/);
+  });
+
+  it("pay with an unclear period is not compared", () => {
+    expect(payBand({ min: 5500, max: 0, currency: "EUR", period: "none", is_ote: false }, 70000, "EUR").band).toBe("not_stated");
+  });
+
+  it("'3-5 years' asks for 3, not 5", () => {
+    expect(yearsIn("3-5 years in Revenue Operations")).toBe(3);
+    expect(yearsIn("3 to 5 years")).toBe(3);
+    expect(yearsIn("5+ years")).toBe(5);
+    expect(yearsIn("at least 6 years of RevOps")).toBe(6);
+  });
+
+  it("a role fit off the 0 to 10 scale is refused, not clamped to 10", () => {
+    expect(() => checkScore(raw({ role_fit: 75 }), { jobText: JD }, RULES, FLOOR)).toThrow(/off the 0 to 10 scale/);
+  });
+
+  it("saved pay is whole, low to high, and hourly or unclear pay is not stored", () => {
+    expect(savedSalary({ min: 80000, max: 60000.4, currency: "eur", period: "year", is_ote: false })).toEqual({ min: 60000, max: 80000, currency: "EUR", period: "year", is_ote: false });
+    expect(savedSalary({ min: 25.5, max: 30, currency: "EUR", period: "hour", is_ote: false }).min).toBeNull();
+    expect(savedSalary({ min: 5500, max: 0, currency: "EUR", period: "none", is_ote: false }).period).toBeNull();
+  });
+
+  it("call pay typed high to low is saved low to high", () => {
+    const c = checkScore(raw(), { jobText: JD, callPay: { min: 80000, max: 60000 } }, RULES, FLOOR);
+    expect(c.salary).toMatchObject({ min: 60000, max: 80000 });
+    expect(c.factors.pay_band).toBe("inside");
+  });
+
+  it("very short quotes do not count", () => {
+    expect(quoteIn("Sales", "Sales team of 40")).toBe(false);
+    expect(quoteIn("sales team", "Sales team of 40")).toBe(true);
   });
 });

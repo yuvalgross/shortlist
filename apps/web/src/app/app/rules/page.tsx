@@ -16,13 +16,14 @@ export default function RulesPage() {
   );
 }
 
-// Same values as the database defaults (20261030000001_scoring_factors.sql), shown before the first save.
+// Same values as the database defaults (20261031000001_score_pasted_job.sql), shown before the first save.
+// Personal rules start at 0: each user switches on the ones that fit their search.
 const DEFAULT_RULES = {
   pay_band: { below: -1.5, inside: 0, above: 0.5 },
-  team_size: { build_small_max: 150, build_small: 0.5, ops_large_min: 300, ops_large: -0.5 },
-  deductions: { sales_ops: -0.5, run_and_report: -0.5, ops_years_gap: -0.5 },
+  team_size: { build_small_max: 150, build_small: 0, ops_large_min: 300, ops_large: 0 },
+  deductions: { sales_ops: 0, run_and_report: 0, ops_years_gap: 0 },
   deduction_cap: -1,
-  cv_threshold_by_factor: { run_and_report: 8.5 },
+  cv_threshold_by_factor: {} as { run_and_report?: number },
 };
 const DEFAULT_LOCATIONS = [
   { match: "home_city", points: 1.5 },

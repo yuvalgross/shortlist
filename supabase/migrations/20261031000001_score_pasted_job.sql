@@ -133,3 +133,38 @@ revoke all on function public.job_match_rejection_flag() from public, anon, auth
 -- Trigger names run in alphabetical order: t_job_matches_factors first, then this one.
 create trigger t_job_matches_rejection before insert or update on public.job_matches
   for each row execute function public.job_match_rejection_flag();
+
+-- ---------------------------------------------------------------------------
+-- 5. Points fit what the rules allow (review of 10-30)
+-- ---------------------------------------------------------------------------
+-- Location points like Cyprus 1.25 were rounded to 1.3 by numeric(3,1); keep two decimals.
+-- The factor rules allow pay +2 with a small team +1 (3) and pay minus 3 with a cap of minus 3 (minus 6),
+-- so adjust_points must hold that whole range, or valid settings would make every score fail.
+alter table public.job_matches drop column total_fit;
+alter table public.job_matches alter column location_points type numeric(4,2);
+alter table public.job_matches drop constraint job_matches_adjust_points_check;
+alter table public.job_matches alter column adjust_points type numeric(4,2);
+alter table public.job_matches add constraint job_matches_adjust_points_check check (adjust_points between -6 and 3);
+alter table public.job_matches
+  add column total_fit numeric(4,2)
+    generated always as (least(10, greatest(0, role_fit + location_points + adjust_points))) stored;
+create index job_matches_queue_idx on public.job_matches (user_id, status, total_fit desc);
+
+-- ---------------------------------------------------------------------------
+-- 6. Personal rules start switched off (Yuval, 10-30: users set their own rules as preferences)
+-- ---------------------------------------------------------------------------
+-- Team size points, the three deductions and a higher CV bar for some roles came from one user's job search
+-- (a GTM engineer moving out of sales). New users start with them at 0 and no extra bar; each user turns
+-- them on in Rules. Pay band points stay on: comparing a stated band with the user's own floor fits anyone.
+-- Existing configs keep their values.
+create or replace function public.default_factor_rules() returns jsonb
+language sql immutable set search_path = public as $$
+  select '{
+    "pay_band":  {"below": -1.5, "inside": 0, "above": 0.5},
+    "team_size": {"build_small_max": 150, "build_small": 0, "ops_large_min": 300, "ops_large": 0},
+    "deductions": {"sales_ops": 0, "run_and_report": 0, "ops_years_gap": 0},
+    "deduction_cap": -1,
+    "cv_threshold_by_factor": {}
+  }'::jsonb
+$$;
+revoke all on function public.default_factor_rules() from public, anon, authenticated;

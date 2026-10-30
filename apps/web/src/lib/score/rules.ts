@@ -72,9 +72,39 @@ export function normalize(s: string): string {
     .trim();
 }
 
-export function quoteIn(quote: string, jobText: string): boolean {
+// Quotes that give points must be long enough to mean something ("the" or "Sales" proves nothing).
+export const MIN_QUOTE_CHARS = 8;
+export function quoteIn(quote: string, jobText: string, min = MIN_QUOTE_CHARS): boolean {
   const q = normalize(quote);
-  return q.length >= 3 && normalize(jobText).includes(q);
+  return q.length >= min && normalize(jobText).includes(q);
+}
+
+// Every number written in a quote, as plain values: "EUR 60,000", "60.000", "60k", "1,2 Mio" are all read.
+export function numbersIn(quote: string): number[] {
+  const out: number[] = [];
+  for (const m of quote.matchAll(/(\d[\d.,'\u00a0 ]*\d|\d)\s*(k|tsd|mio|m)?\b/gi)) {
+    const digits = m[1].replace(/[^\d.,]/g, "");
+    // A separator followed by exactly three digits is a thousands separator; otherwise a decimal point.
+    const plain = digits.replace(/[.,](?=\d{3}(\D|$))/g, "").replace(",", ".");
+    let n = Number(plain);
+    if (!Number.isFinite(n)) continue;
+    const unit = (m[2] ?? "").toLowerCase();
+    if (unit === "k" || unit === "tsd") n *= 1000;
+    if (unit === "mio" || unit === "m") n *= 1_000_000;
+    out.push(n);
+  }
+  return out;
+}
+const inQuote = (value: number, quote: string) => numbersIn(quote).some((n) => Math.abs(n - value) < 0.5);
+
+// A number the user typed: "70000", "70.000", "70,000", "70 000" and "70k" all mean 70000.
+// Only the first number counts ("50-100" is 50). Anything else is 0, which means "not given".
+export function parseAmount(input: string): number {
+  const m = input.match(/\d[\d.,' \u00a0]*/);
+  if (!m) return 0;
+  let n = Number(m[0].replace(/[^\d]/g, ""));
+  if (/^\s*\d[\d.,' \u00a0]*\s*k\b/i.test(input)) n *= 1000;
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,8 +124,10 @@ export function payBand(pay: PayInput | null, floor: number | null, floorCurrenc
   if (cur && cur !== floorCurrency.toUpperCase()) {
     return { band: "not_stated", note: `pay is in ${cur}, your floor is in ${floorCurrency}; not compared` };
   }
-  const yearly = pay.period === "month" ? 12 : pay.period === "year" || pay.period === "none" ? 1 : 0;
-  if (!yearly) return { band: "not_stated", note: "pay is stated per hour; not compared" };
+  const yearly = pay.period === "month" ? 12 : pay.period === "year" ? 1 : 0;
+  if (!yearly) {
+    return { band: "not_stated", note: pay.period === "hour" ? "pay is stated per hour; not compared" : "the ad does not say if the pay is yearly or monthly; not compared" };
+  }
   // OTE only: take base as half, as the scan does when the split is not given
   const base = pay.is_ote ? 0.5 : 1;
   let lo = pay.min > 0 ? pay.min * yearly * base : 0;
@@ -157,12 +189,23 @@ export type Checked = {
   };
 };
 
+// What is stored on the job: whole yearly or monthly amounts, low to high. Hourly or unclear pay is not stored.
+export function savedSalary(pay: PayInput | null): Checked["salary"] {
+  if (!pay || (pay.period !== "year" && pay.period !== "month")) return { min: null, max: null, currency: null, period: null, is_ote: false };
+  const vals = [pay.min, pay.max].map((n) => (n > 0 ? Math.round(n) : null));
+  const [lo, hi] = vals[0] != null && vals[1] != null && vals[0] > vals[1] ? [vals[1], vals[0]] : vals;
+  return { min: lo, max: hi, currency: (pay.currency || "").toUpperCase().slice(0, 3) || null, period: pay.period, is_ote: pay.is_ote };
+}
+
 export function roundHalf(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.min(10, Math.max(0, Math.round(n * 2) / 2));
 }
 
-const yearsIn = (quote: string) => Math.max(0, ...[...quote.matchAll(/(\d{1,2})\s*\+?\s*(?:years|yrs|jahre)/gi)].map((m) => Number(m[1])));
+// The years a quote asks for. A range ("3-5 years", "3 to 5 years") asks for its lower end.
+export const yearsIn = (quote: string) => Math.max(0, ...[...quote.matchAll(
+  /(\d{1,2})(?:\s*(?:-|\u2013|to|bis)\s*(\d{1,2}))?\s*\+?\s*(?:years|yrs|jahre)/gi,
+)].map((m) => Number(m[1])));
 
 export function checkScore(
   raw: RawScore,
@@ -170,6 +213,9 @@ export function checkScore(
   rules: { locations: LocationRule[]; teamSize: TeamSizeRules },
   targets: Pick<Targets, "salary_min" | "salary_currency">,
 ): Checked {
+  if (!Number.isFinite(raw.role_fit) || raw.role_fit < 0 || raw.role_fit > 10) {
+    throw new Error(`The matching model returned a role fit off the 0 to 10 scale (${raw.role_fit}).`);
+  }
   const text = input.location ? `${input.jobText}\nLocation: ${input.location}` : input.jobText;
   const has = (q: string) => quoteIn(q, text);
   const dropped: string[] = [];
@@ -211,12 +257,15 @@ export function checkScore(
     pay = { ...input.callPay, currency: targets.salary_currency, period: "year", is_ote: false };
     paySource = "call";
   } else if (raw.salary.stated) {
-    if (has(raw.salary.quote) && /\d/.test(raw.salary.quote)) {
+    const amounts = [raw.salary.min, raw.salary.max].filter((n) => n > 0);
+    if (!has(raw.salary.quote)) {
+      dropped.push("pay: quote not found in the ad, treated as not stated");
+    } else if (!amounts.length || !amounts.every((n) => inQuote(n, raw.salary.quote))) {
+      dropped.push("pay: the amounts are not the ones in the quote, treated as not stated");
+    } else {
       pay = { min: raw.salary.min, max: raw.salary.max, currency: raw.salary.currency, period: raw.salary.period, is_ote: raw.salary.is_ote };
       paySource = "posting";
       quotes.pay = raw.salary.quote;
-    } else {
-      dropped.push("pay: quote not found in the ad, treated as not stated");
     }
   }
   const payResult = payBand(pay, targets.salary_min, targets.salary_currency);
@@ -230,13 +279,17 @@ export function checkScore(
     headcount = Math.round(input.headcount);
     headcountSource = "other";
   } else if (raw.headcount.stated && raw.headcount.value > 0) {
-    if (has(raw.headcount.quote)) {
-      headcount = raw.headcount.value;
+    if (has(raw.headcount.quote) && inQuote(raw.headcount.value, raw.headcount.quote)) {
+      headcount = Math.round(raw.headcount.value);
       headcountSource = "company_site";
       quotes.headcount = raw.headcount.quote;
-    } else dropped.push("team size: quote not found in the ad");
+    } else dropped.push("team size: the headcount is not in a quote from the ad");
   }
-  const shape = raw.role_shape.value;
+  let shape = raw.role_shape.value;
+  if (shape !== "other" && !has(raw.role_shape.quote)) {
+    dropped.push(`role shape "${shape.replace("_", " ")}": quote not found in the ad, so no team size points`);
+    shape = "other";
+  }
   factors.team_size = teamSize(shape, headcount, rules.teamSize);
 
   const plus = raw.plus.map((r) => r.point.trim()).filter(Boolean).slice(0, 8);
@@ -255,9 +308,7 @@ export function checkScore(
     factors,
     headcount,
     headcount_source: headcountSource,
-    salary: pay
-      ? { min: pay.min || null, max: pay.max || null, currency: pay.currency || null, period: pay.period === "none" ? null : pay.period, is_ote: pay.is_ote }
-      : { min: null, max: null, currency: null, period: null, is_ote: false },
+    salary: savedSalary(pay),
     reasons: { plus, minus },
     details: { summary: raw.summary.trim(), pay_note: payResult.note, languages, shape, quotes, dropped },
   };

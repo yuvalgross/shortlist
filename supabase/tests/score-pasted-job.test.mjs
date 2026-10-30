@@ -24,13 +24,23 @@ const payload = (over = {}) => ({
   },
   ...over,
 });
+const SCAN_RULES = {
+  factor_rules: {
+    team_size: { build_small_max: 150, build_small: 0.5, ops_large_min: 300, ops_large: -0.5 },
+    deductions: { sales_ops: -0.5, run_and_report: -0.5, ops_years_gap: -0.5 },
+    deduction_cap: -1,
+    cv_threshold_by_factor: { run_and_report: 8.5 },
+  },
+};
 const score = (who, p) => who(`select score_pasted_job($1::jsonb) as r`, [JSON.stringify(p)]);
 
 before(async () => {
   ({ as } = await freshDb([A, B]));
+  const r = await asA(`select set_scoring_config($1::jsonb)`, [JSON.stringify(SCAN_RULES)]);
+  assert.equal(r.error, undefined, r.error);
 });
 
-test('Kubermatic replay: role 8, remote +1.5, small team +0.5 = 10 (capped), saved with a default config', async () => {
+test('Kubermatic replay: role 8, remote +1.5, small team +0.5 = 10', async () => {
   const r = await score(asA, payload());
   assert.equal(r.error, undefined, r.error);
   const m = await asA(`select total_fit::float8 as total, adjust_points::float8 as adjust, cv_threshold_applied::float8 as bar, flags
@@ -159,4 +169,30 @@ test('scan replay: every recorded total comes out the same', async () => {
     out.push([name, m.rows[0].total, expected]);
   }
   for (const [name, got, expected] of out) assert.equal(got, expected, name);
+});
+
+test('a user with no rules yet gets the neutral defaults on the first paste: no team size or deduction points', async () => {
+  const r = await score(asB, payload({ match: { role_fit: 7, location_points: 1.5, factors: { team_size: 'build_small', run_and_report: true } } }));
+  assert.equal(r.error, undefined, r.error);
+  const m = await asB(`select total_fit::float8 as total, cv_threshold_applied::float8 as bar from job_matches where id = $1`, [r.rows[0].r.match_id]);
+  assert.deepEqual(m.rows[0], { total: 8.5, bar: 8 });
+});
+
+test('Cyprus +1.25 keeps both decimals, and wide but valid rules do not break saving', async () => {
+  let r = await score(asA, payload({ company: { name: 'Limassol Co' }, match: { role_fit: 8, location_points: 1.25, factors: {} } }));
+  assert.equal(r.error, undefined, r.error);
+  let m = await asA(`select total_fit::float8 as total, location_points::float8 as loc from job_matches where id = $1`, [r.rows[0].r.match_id]);
+  assert.deepEqual(m.rows[0], { total: 9.25, loc: 1.25 });
+  const cfg = await asB(`select set_scoring_config($1::jsonb)`, [JSON.stringify({ factor_rules: {
+    pay_band: { below: -3, inside: 0, above: 2 }, team_size: { build_small: 1, ops_large: -1 }, deduction_cap: -3,
+    deductions: { sales_ops: -1, run_and_report: -1, ops_years_gap: -1 } } })]);
+  assert.equal(cfg.error, undefined, cfg.error);
+  r = await score(asB, payload({ company: { name: 'Big pay', headcount: 50 }, job: { title: 'GTM', description: JD, salary_min: 100000 },
+    match: { role_fit: 5, location_points: 0, factors: { pay_band: 'above', pay_band_source: 'posting', team_size: 'build_small' } } }));
+  assert.equal(r.error, undefined, r.error);
+  r = await score(asB, payload({ company: { name: 'Low pay', headcount: 900 }, job: { title: 'Ops', description: JD },
+    match: { role_fit: 9, location_points: 0, factors: { pay_band: 'below', pay_band_source: 'posting', team_size: 'ops_large', sales_ops: true, run_and_report: true, ops_years_gap: true } } }));
+  assert.equal(r.error, undefined, r.error);
+  m = await asB(`select total_fit::float8 as total, adjust_points::float8 as adj from job_matches where id = $1`, [r.rows[0].r.match_id]);
+  assert.deepEqual(m.rows[0], { total: 3, adj: -6 });
 });

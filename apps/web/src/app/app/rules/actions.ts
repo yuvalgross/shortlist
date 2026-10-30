@@ -58,7 +58,8 @@ export async function saveRules(_prev: RulesState, formData: FormData): Promise<
         },
         deductions: { sales_ops: numbers.sales_ops, run_and_report: numbers.run_and_report, ops_years_gap: numbers.ops_years_gap },
         deduction_cap: numbers.deduction_cap,
-        cv_threshold_by_factor: { run_and_report: numbers.cv_run_and_report },
+        // A bar at or under the normal CV bar adds nothing, so it is left out
+        cv_threshold_by_factor: numbers.cv_run_and_report > numbers.cv_threshold ? { run_and_report: numbers.cv_run_and_report } : {},
       },
     },
   });

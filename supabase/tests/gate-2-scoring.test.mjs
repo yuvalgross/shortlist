@@ -7,6 +7,16 @@ import { freshDb } from './helpers.mjs';
 const A = '11111111-1111-1111-1111-111111111111';
 const B = '22222222-2222-2222-2222-222222222222';
 let as, configA, small, big, unknownSize;
+// Yuval's scan rules, which he sets in Rules; new users start with these switched off (20261031000001).
+const SCAN_RULES = {
+  factor_rules: {
+    team_size: { build_small_max: 150, build_small: 0.5, ops_large_min: 300, ops_large: -0.5 },
+    deductions: { sales_ops: -0.5, run_and_report: -0.5, ops_years_gap: -0.5 },
+    deduction_cap: -1,
+    cv_threshold_by_factor: { run_and_report: 8.5 },
+  },
+};
+
 const asA = (sql, p) => as('authenticated', A, sql, p);
 const asWorker = (sql, p) => as('service_role', null, sql, p);
 
@@ -33,7 +43,7 @@ async function match(companyId, roleFit, locationPoints, factors) {
 
 before(async () => {
   ({ as } = await freshDb([A, B]));
-  const r = await asA(`select set_scoring_config('{}'::jsonb) as id`);
+  const r = await asA(`select set_scoring_config($1::jsonb) as id`, [JSON.stringify(SCAN_RULES)]);
   assert.equal(r.error, undefined, r.error);
   configA = r.rows[0].id;
   small = await company('Small', 60);
@@ -41,7 +51,7 @@ before(async () => {
   unknownSize = await company('Unknown', null);
 });
 
-test('default factor rules match the scan standing rules', async () => {
+test('the scan standing rules are stored as set', async () => {
   const r = await asA(`select factor_rules from scoring_configs where id = $1`, [configA]);
   const f = r.rows[0].factor_rules;
   assert.deepEqual(f.pay_band, { below: -1.5, inside: 0, above: 0.5 });
@@ -141,7 +151,7 @@ test('set_scoring_config merges partial factor rules and validates them', async 
   assert.equal(r.error, undefined, r.error);
   r = await asA(`select factor_rules from scoring_configs where is_active`);
   assert.equal(r.rows[0].factor_rules.team_size.build_small_max, 100);
-  assert.equal(r.rows[0].factor_rules.team_size.build_small, 0.5);
+  assert.equal(r.rows[0].factor_rules.team_size.build_small, 0);
   assert.equal(r.rows[0].factor_rules.deduction_cap, -1);
 
   for (const [cfg, msg] of [
@@ -160,4 +170,14 @@ test('set_scoring_config merges partial factor rules and validates them', async 
 test('the profile snapshot carries the active factor rules', async () => {
   const r = await asA(`select snapshot from profile_snapshots`);
   assert.equal(r.rows[0].snapshot.scoring.factor_rules.team_size.build_small_max, 100);
+});
+
+test('new users start with the personal rules switched off; pay band stays on', async () => {
+  const r = await as('authenticated', B, `select set_scoring_config('{}'::jsonb) as id`);
+  const f = (await as('authenticated', B, `select factor_rules from scoring_configs where id = $1`, [r.rows[0].id])).rows[0].factor_rules;
+  assert.deepEqual(f.pay_band, { below: -1.5, inside: 0, above: 0.5 });
+  assert.deepEqual(f.deductions, { sales_ops: 0, run_and_report: 0, ops_years_gap: 0 });
+  assert.equal(f.team_size.build_small, 0);
+  assert.equal(f.team_size.ops_large, 0);
+  assert.deepEqual(f.cv_threshold_by_factor, {});
 });

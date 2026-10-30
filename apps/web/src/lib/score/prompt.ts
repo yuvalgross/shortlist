@@ -16,8 +16,8 @@ Role fit (0 to 10, steps of 0.5)
 
 Labels (code turns these into points, so only label what the ad clearly says)
 7. "quote" fields must be copied character for character from the ad: one contiguous piece of a single line. Do not fix typos or join lines. Use "" when there is nothing to quote.
-8. salary: stated true only when the ad gives a number. min and max as plain numbers (60000, not "60k"); 0 when one side is missing. currency as a 3 letter code. period: year, month, hour, or none when unclear. is_ote true when the ad says OTE or on target earnings without a base.
-9. headcount: stated true only when the ad states how many people work at the company (for example "we are 60 people"). Never estimate.
+8. salary: stated true only when the ad gives a number. min and max as plain numbers (60000, not "60k"); 0 when one side is missing. currency as a 3 letter code. period: year when the ad says per year, annual or p.a., or the amount is plainly a yearly salary; month or hour when it says so; none when it is unclear. min and max must be the numbers written in "quote". is_ote true when the ad says OTE or on target earnings without a base.
+9. headcount: stated true only when the ad states how many people work at the company (for example "we are 60 people"), and "value" is that number as written in the quote. Never estimate.
 10. location: "rule" is the index (0 = first) of the one rule in <location_rules> that this job meets, or -1 when none fits or the ad does not say. Read remote limits carefully: "remote, UK only" is not "remote anywhere in the EU". "quote" is the ad's location line.
 11. languages_required: languages other than English that the ad requires (not "a plus"), with the quote.
 12. role_shape: "build" when the role mainly builds GTM systems (first hire, founding, build from zero, automation, integrations, signal or outbound engines, GTM Engineer, RevOps Engineer, GTM Systems). "ops_titled" when the title is Revenue Operations, Sales Operations or Operations Manager or Specialist and the role is not mainly building. Otherwise "other".

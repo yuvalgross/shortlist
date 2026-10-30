@@ -5,12 +5,10 @@ import { refresh } from "next/cache";
 import { requireUser } from "@/lib/supabase/user";
 import { claudeScoreCall } from "@/lib/score/model";
 import { scoreJob } from "@/lib/score/run";
+import { parseAmount } from "@/lib/score/rules";
 
 const str = (f: FormData, k: string, max = 300) => String(f.get(k) ?? "").trim().slice(0, max);
-const int = (f: FormData, k: string) => {
-  const n = Number(str(f, k, 20).replace(/[^\d.]/g, ""));
-  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
-};
+const int = (f: FormData, k: string) => parseAmount(str(f, k, 30));
 
 export type ScoreState = { error: string | null };
 

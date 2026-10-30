@@ -63,13 +63,22 @@ export function RulesForm({ v, rows }: { v: RulesValues; rows: number }) {
       </Card>
 
       <Card className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold">Pay, team size and deductions</h2>
-        <p className="text-sm text-muted">Applied after role fit and location. The three deductions and the large team minus together take no more than the cap.</p>
+        <h2 className="text-lg font-semibold">Pay band</h2>
+        <p className="text-sm text-muted">Compares a pay band the ad or the company states with the salary floor in Targets. No stated band means no points.</p>
         <div className="flex flex-wrap gap-4">
           <Num name="pay_below" text="Band tops out under your floor" v={x.pay_below} />
           <Num name="pay_inside" text="Your floor is inside the band" v={x.pay_inside} />
           <Num name="pay_above" text="Band starts at or above your floor" v={x.pay_above} />
         </div>
+      </Card>
+
+      <Card className="flex flex-col gap-4">
+        <h2 className="text-lg font-semibold">Your personal rules</h2>
+        <p className="text-sm text-muted">
+          Preferences from your own search, switched off at 0. Use them when a kind of role keeps going badly or well for you,
+          for example minus 0.5 for roles that mainly run an existing setup. Each one only applies when the ad shows it with a quote.
+          The three deductions and the large company minus together take no more than the cap.
+        </p>
         <div className="flex flex-wrap gap-4">
           <Num name="build_small" text="Build role at a small company" v={x.build_small} />
           <Num name="build_small_max" text="Small means under (people)" v={x.build_small_max} step="1" />
