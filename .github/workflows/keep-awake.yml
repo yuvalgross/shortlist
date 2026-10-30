@@ -1,0 +1,32 @@
+name: keep database awake
+
+# Supabase pauses free projects after about a week without use, which takes the site down for testers.
+# One small read a day counts as use. Row level security returns nothing to an anonymous visitor,
+# so no data leaves the database. A failed run emails the repo owner, which is the early warning.
+on:
+  schedule:
+    - cron: "17 6 * * *" # every day 06:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Public values: the same URL and publishable key are shipped to every browser that opens the site.
+      SUPABASE_URL: https://drepfivmsbwysryvpjlm.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_L54B3JlWTIxGpHcuVtT7_g_u-5fwi-Q
+    steps:
+      - name: Read one row through the database API
+        run: |
+          code=$(curl -sS -o /tmp/body -w '%{http_code}' --retry 3 --retry-delay 20 --retry-all-errors \
+            "$SUPABASE_URL/rest/v1/profiles?select=user_id&limit=1" \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY")
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Database did not answer (HTTP $code). It may be paused: open supabase.com, the shortlist project, and click Restore project."
+            cat /tmp/body
+            exit 1
+          fi
