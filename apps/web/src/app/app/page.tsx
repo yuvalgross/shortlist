@@ -30,7 +30,7 @@ async function Home() {
   ];
   return (
     <>
-      <PageTitle sub={`Signed in as ${email}. Job targets, scoring and the daily queue arrive in the next gates.`}>Set up your profile</PageTitle>
+      <PageTitle sub={`Signed in as ${email}. Once your profile is confirmed, set your Targets and Rules and score a job. The job search and daily queue arrive in the next gates.`}>Set up your profile</PageTitle>
       <div className="grid gap-4 sm:grid-cols-2">
         {items.map((i) => (
           <Link key={i.title} href={i.href}>
